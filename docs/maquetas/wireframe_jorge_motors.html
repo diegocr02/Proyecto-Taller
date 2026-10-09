@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wireframe – Asistente de Gestión de Taller y Repuestos – Jorge Motors</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: #d9d9d9; color: #222;
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  a { color: #222; }
+  :focus-visible { outline: 3px solid #000; outline-offset: 2px; }
+
+  /* Navegación solo con anclas: #ot va antes que #inicio en el DOM */
+  .pantalla { display: none; max-width: 1120px; margin: 0 auto; }
+  #inicio, .pantalla:target { display: block; }
+  #ot:target ~ #inicio { display: none; }
+
+  /* Marco de navegador: deja claro que es una maqueta */
+  .marco { border: 2px solid #555; background: #fff; box-shadow: 6px 6px 0 #9a9a9a; }
+  .marco-barra { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #eee; border-bottom: 2px solid #555; }
+  .marco-barra i { width: 11px; height: 11px; border: 2px solid #777; border-radius: 50%; }
+  .url { flex: 1; margin-left: 8px; padding: 3px 10px; border: 1px solid #999; background: #fff; font-size: 13px; color: #555; }
+  .titulo-maqueta { max-width: 1120px; margin: 0 auto 10px; font-size: 13px; color: #444; }
+
+  .app { display: grid; grid-template-columns: 200px 1fr 260px; min-height: 620px; }
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+
+  .lateral { border-right: 2px solid #bbb; padding: 16px 12px; background: #f6f6f6; }
+  .lateral b { display: block; margin-bottom: 14px; }
+  .lateral a { display: block; padding: 7px 10px; margin-bottom: 4px; text-decoration: none; border: 1px solid transparent; }
+  .lateral a.actual { border-color: #333; background: #fff; font-weight: 600; }
+  .lateral a.inactivo { color: #888; }
+  .rol { margin-top: 24px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 13px; color: #555; }
+
+  .contenido { padding: 20px 22px; }
+  .contenido h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { margin: 0 0 18px; color: #555; }
+
+  .bloque { position: relative; border: 2px solid #888; padding: 28px 16px 16px; margin-bottom: 18px; }
+  .bloque h2 { font-size: 16px; margin: 0 0 12px; }
+  .etiqueta { position: absolute; top: -2px; right: -2px; padding: 2px 8px; background: #333; color: #fff; font-size: 12px; }
+  .nota { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; margin-right: 6px;
+          border-radius: 50%; background: #555; color: #fff; font-size: 11px; font-weight: 700; vertical-align: 1px; }
+
+  .cta { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .cta p { margin: 0; max-width: 46ch; color: #444; }
+
+  .boton { display: inline-block; font: inherit; padding: 9px 16px; border: 2px solid #333; background: #fff; color: #222; cursor: pointer; text-decoration: none; }
+  .boton.principal { background: #333; color: #fff; }
+
+  .resumen { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+  .resumen div { border: 1px solid #aaa; padding: 10px; }
+  .resumen strong { display: block; font-size: 24px; }
+  .resumen span { font-size: 13px; color: #555; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #bbb; padding: 7px 9px; text-align: left; font-size: 14px; }
+  th { background: #e8e8e8; font-weight: 600; }
+  .linea { display: inline-block; height: 9px; width: 75%; background: #cfcfcf; }
+  .corta { width: 35%; }
+  .vacio { border: 1px dashed #999; padding: 10px 12px; margin-top: 10px; font-size: 14px; color: #555; }
+
+  fieldset { border: 1px solid #aaa; margin: 0 0 14px; padding: 12px 14px; }
+  legend { padding: 0 6px; font-weight: 600; }
+  .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 16px; }
+  .ancho { grid-column: 1 / -1; }
+  label { display: block; margin-bottom: 3px; font-size: 13px; color: #444; }
+  input, select, textarea { width: 100%; padding: 7px 9px; font: inherit; border: 1px solid #888; background: #fff; }
+  textarea { min-height: 72px; resize: vertical; }
+  .solo-lectura { background: #eee; color: #666; }
+  .ayuda { display: block; margin-top: 2px; font-size: 12px; color: #666; }
+  .con-error input { border: 2px solid #222; background: #efefef; }
+  .con-error .ayuda { color: #222; font-weight: 600; }
+  .aviso { margin: 0 0 14px; padding: 8px 10px; border-left: 4px solid #666; background: #f3f3f3; font-size: 13px; }
+  .barra-acciones { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid #ccc; }
+
+  .variantes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .estado { border: 1px solid #999; padding: 10px 12px; font-size: 14px; }
+  .estado b { display: block; margin-bottom: 4px; }
+  .estado.fuerte { border: 2px solid #333; background: #eee; }
+  .spinner { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px;
+             border: 2px solid #aaa; border-top-color: #222; border-radius: 50%; }
+
+  /* Asistente: caja con aspa, convención de placeholder de wireframe */
+  .asistente { border-left: 2px solid #bbb; padding: 16px 12px; background: #fafafa; }
+  .asistente h2 { font-size: 15px; margin: 0 0 8px; }
+  .aspa { position: relative; height: 420px; border: 2px dashed #888;
+          background: linear-gradient(to top right, transparent calc(50% - 1px), #bbb, transparent calc(50% + 1px)),
+                      linear-gradient(to bottom right, transparent calc(50% - 1px), #bbb, transparent calc(50% + 1px)); }
+  .aspa p { position: absolute; left: 10px; right: 10px; bottom: 10px; margin: 0; padding: 6px; background: #fafafa; font-size: 13px; color: #555; }
+</style>
+</head>
+<body>
+
+<!-- ============ PANTALLA 2 · H1 Registro de orden de trabajo ============ -->
+<section class="pantalla" id="ot" aria-labelledby="t-ot">
+  <p class="titulo-maqueta">Pantalla 2 de 2 – H1 Registro de orden de trabajo digital (rol: Recepcionista)</p>
+  <div class="marco">
+    <div class="marco-barra"><i></i><i></i><i></i><span class="url">jorge-motors / ordenes-trabajo / nueva</span></div>
+    <div class="app">
+      <nav class="lateral" aria-label="Módulos">
+        <b>Jorge Motors</b>
+        <a href="#inicio">Inicio</a>
+        <a href="#ot" class="actual" aria-current="page">Nueva orden de trabajo</a>
+        <a href="#ot" class="inactivo">Historial</a><a href="#ot" class="inactivo">Stock</a>
+        <a href="#ot" class="inactivo">Conteo físico</a><a href="#ot" class="inactivo">Reportes</a>
+        <div class="rol">Sesión: Recepcionista</div>
+      </nav>
+
+      <main class="contenido">
+        <h1 id="t-ot">Nueva orden de trabajo</h1>
+        <p class="sub">Complete los datos al recibir el vehículo. Los campos con * son obligatorios.</p>
+
+        <form class="bloque" action="#ot" onsubmit="return false">
+          <span class="etiqueta">H1 – R1.3, R1.4, R1.6</span>
+          <p class="aviso"><span class="nota">1</span>Use solo datos simulados. No registre nombres ni DNI de personas reales (Ley N.º 29733).</p>
+          <fieldset><legend>Cliente</legend>
+            <div class="campos">
+              <div><label for="f-nombre">Nombre del cliente *</label><input id="f-nombre" maxlength="100"><span class="ayuda">Máximo 100 caracteres</span></div>
+              <div class="con-error"><label for="f-dni">DNI *</label><input id="f-dni" maxlength="8" inputmode="numeric" aria-invalid="true" aria-describedby="e-dni"><span class="ayuda" id="e-dni"><span class="nota">2</span>Ingrese los 8 dígitos del DNI</span></div>
+            </div>
+          </fieldset>
+          <fieldset><legend>Vehículo</legend>
+            <div class="campos">
+              <div><label for="f-placa">Placa *</label><input id="f-placa" maxlength="10"><span class="ayuda">Formato ABC-123</span></div>
+              <div><label for="f-marca">Marca *</label><input id="f-marca" maxlength="50"></div>
+              <div><label for="f-modelo">Modelo *</label><input id="f-modelo" maxlength="50"></div>
+              <div><label for="f-anio">Año *</label><input id="f-anio" type="number" min="1900"><span class="ayuda">De 1900 al año en curso</span></div>
+              <div><label for="f-km">Kilometraje *</label><input id="f-km" type="number" min="0" max="999999"><span class="ayuda">De 0 a 999 999 km</span></div>
+            </div>
+          </fieldset>
+          <fieldset><legend>Servicio</legend>
+            <div class="campos">
+              <div class="ancho"><label for="f-motivo">Motivo de ingreso *</label><textarea id="f-motivo" maxlength="500"></textarea><span class="ayuda">Máximo 500 caracteres</span></div>
+              <div><label for="f-tec">Técnico asignado *</label><select id="f-tec"><option>Seleccione un técnico</option><option>Técnico A</option><option>Técnico B</option><option>Técnico C</option></select></div>
+              <div><label for="f-fecha">Fecha y hora de creación</label><input id="f-fecha" class="solo-lectura" value="La asigna el sistema" readonly></div>
+            </div>
+          </fieldset>
+          <div class="barra-acciones">
+            <button type="button" class="boton principal">Crear orden de trabajo</button>
+            <a class="boton" href="#inicio">Cancelar</a>
+          </div>
+        </form>
+
+        <section class="bloque" aria-labelledby="t-var">
+          <span class="etiqueta">H1 – R1.5, R1.7 · R7.2, R7.3</span>
+          <h2 id="t-var"><span class="nota">3</span>Respuesta del sistema tras pulsar «Crear orden de trabajo»</h2>
+          <div class="variantes">
+            <div class="estado"><b>Procesando (más de 2 s)</b><span class="spinner" aria-hidden="true"></span>Creando la orden de trabajo…</div>
+            <div class="estado fuerte"><b>Orden creada</b>N.º OT <span class="linea corta"></span><br>Ya está disponible para el técnico asignado.</div>
+            <div class="estado"><b>No se pudo crear</b>Sus datos siguen en el formulario.<br><button type="button" class="boton" style="margin-top:8px">Reintentar</button></div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="asistente" aria-label="Asistente (Unidad 3)">
+        <h2>Asistente (Unidad 3)</h2>
+        <div class="aspa"><p>Espacio reservado. Sin contenido ni funcionalidad en esta unidad.</p></div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PANTALLA 1 · Entrada ============ -->
+<section class="pantalla" id="inicio" aria-labelledby="t-inicio">
+  <p class="titulo-maqueta">Pantalla 1 de 2 – Entrada</p>
+  <div class="marco">
+    <div class="marco-barra"><i></i><i></i><i></i><span class="url">jorge-motors / inicio</span></div>
+    <div class="app">
+      <nav class="lateral" aria-label="Módulos">
+        <b>Jorge Motors</b>
+        <a href="#inicio" class="actual" aria-current="page">Inicio</a>
+        <a href="#ot">Nueva orden de trabajo</a>
+        <a href="#inicio" class="inactivo">Historial</a><a href="#inicio" class="inactivo">Stock</a>
+        <a href="#inicio" class="inactivo">Conteo físico</a><a href="#inicio" class="inactivo">Reportes</a>
+        <div class="rol">Sesión: <span class="linea corta"></span></div>
+      </nav>
+
+      <main class="contenido">
+        <h1 id="t-inicio">Taller y repuestos</h1>
+        <p class="sub">Registre vehículos y revise el estado del inventario.</p>
+
+        <section class="bloque cta" aria-label="Registrar orden de trabajo">
+          <span class="etiqueta">H1</span>
+          <p><strong>¿Llegó un vehículo?</strong> Registre su orden de trabajo y quedará disponible para el técnico asignado.</p>
+          <a class="boton principal" href="#ot">Registrar orden de trabajo</a>
+        </section>
+
+        <section class="bloque" aria-labelledby="t-alertas">
+          <span class="etiqueta">H4 – R4.1, R4.2, R4.3, R4.6</span>
+          <h2 id="t-alertas">Repuestos en stock mínimo</h2>
+          <div class="resumen">
+            <div><strong>3</strong><span>repuestos en alerta</span></div>
+            <div><strong><span class="linea"></span></strong><span>última consulta</span></div>
+          </div>
+          <table>
+            <thead><tr><th>Repuesto</th><th>Código</th><th>Cantidad actual</th><th>Stock mínimo</th></tr></thead>
+            <tbody>
+              <tr><td><span class="linea"></span></td><td><span class="linea"></span></td><td><span class="linea corta"></span></td><td><span class="linea corta"></span></td></tr>
+              <tr><td><span class="linea"></span></td><td><span class="linea"></span></td><td><span class="linea corta"></span></td><td><span class="linea corta"></span></td></tr>
+              <tr><td><span class="linea"></span></td><td><span class="linea"></span></td><td><span class="linea corta"></span></td><td><span class="linea corta"></span></td></tr>
+            </tbody>
+          </table>
+          <div class="vacio"><b>Variante sin alertas:</b> ningún repuesto está en su stock mínimo.</div>
+          <div class="vacio"><b>Variante sin servicio:</b> el servicio de inventario no está disponible. Las alertas aparecerán cuando se restablezca.</div>
+        </section>
+      </main>
+
+      <aside class="asistente" aria-label="Asistente (Unidad 3)">
+        <h2>Asistente (Unidad 3)</h2>
+        <div class="aspa"><p>Espacio reservado. Sin contenido ni funcionalidad en esta unidad.</p></div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
+<!--
+HISTORIAS QUE ESTA MAQUETA NO CUBRE Y POR QUÉ
+- H2 Historial (R2), H3 Stock (R3), H5 Conteo físico (R5) y H6 Reporte por técnico (R6):
+  aparecen solo como entradas inactivas del menú lateral. La tarea limita la maqueta a dos
+  pantallas y H1 es la prioritaria.
+- H4 Alertas de stock mínimo (R4): cubierta en la entrada (lista, variante vacía y variante sin
+  servicio). La vista no se adapta por rol porque la autenticación está pendiente en design.md.
+- R7 Rendimiento: los umbrales de 2 s y 30 s no se pueden representar; solo se muestran los estados.
+- R8 Credenciales y R9 Trazabilidad de IA: no tienen interfaz. R9 depende del asistente de la
+  Unidad 3, representado como espacio vacío.
+- Notas numeradas: 1 = R1.6/R8.2, 2 = R1.4 (error junto al campo faltante), 3 = R1.5, R1.7, R7.2, R7.3.
+- Pendiente: requirements.md asigna H1 al Recepcionista y design.md al Técnico.
+-->
