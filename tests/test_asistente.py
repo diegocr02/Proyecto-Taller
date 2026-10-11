@@ -128,3 +128,13 @@ def test_asistente_funciona_sin_mcp(cliente_con_mcp, ruta_db):
 def test_asistente_rechaza_rol_o_pregunta_invalidos(cliente_con_mcp, ruta_db, cuerpo):
     respuesta = crear_cliente(cliente_con_mcp, ruta_db, lambda p: "ok").post("/asistente", json=cuerpo)
     assert respuesta.status_code == 422
+
+
+def test_contexto_etiqueta_el_historial_por_placa_y_dni(ruta_db):
+    """El historial enviado a la IA indica a que placa o DNI pertenece cada lista de OT."""
+    from app.modules.asistente.router import obtener_contexto
+
+    contexto = obtener_contexto("¿Qué tienen ABC-123 y el DNI 10000002?", McpEspia(ruta_db=ruta_db))
+    historial = contexto["historial"]
+    assert historial["OT del vehiculo con placa ABC-123"][0]["motivo"] == "Mantenimiento preventivo 45k"
+    assert historial["OT del cliente con DNI 10000002"][0]["motivo"] == "Ruido al frenar"
