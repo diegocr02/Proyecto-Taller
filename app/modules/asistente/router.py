@@ -39,11 +39,12 @@ def obtener_contexto(pregunta: str, mcp: McpReadClient) -> Dict[str, Any]:
                 break
         contexto["repuestos"] = list(repuestos.values())[:MAX_REPUESTOS_CONTEXTO]
 
-        historial = []
+        # Cada historial va etiquetado con su criterio para que la IA sepa a quien pertenece
+        historial: Dict[str, Any] = {}
         for dni in PATRON_DNI.findall(pregunta):
-            historial.extend(mcp.buscar_historial(dni, tipo="dni")[:10])
+            historial[f"OT del cliente con DNI {dni}"] = mcp.buscar_historial(dni, tipo="dni")[:10]
         for placa in PATRON_PLACA.findall(pregunta):
-            historial.extend(mcp.buscar_historial(placa, tipo="placa")[:10])
+            historial[f"OT del vehiculo con placa {placa.upper()}"] = mcp.buscar_historial(placa, tipo="placa")[:10]
         if historial:
             contexto["historial"] = historial
     except McpNoDisponibleError as e:
