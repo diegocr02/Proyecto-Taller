@@ -32,3 +32,4 @@ build/
 
 # Material del curso (no se versiona)
 *.docx
+!docs/S7_Guia_de_laboratorio_LosPapus.docx
