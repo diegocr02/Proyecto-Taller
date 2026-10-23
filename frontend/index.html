@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!-- Historia: H-01..H-09 (pantallas por rol) -->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jorge Motors - Asistente de Gestión de Taller y Repuestos</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header class="cabecera">
+        <div>
+            <h1>Jorge Motors</h1>
+            <p>Sistema de Gestión de Taller y Repuestos</p>
+        </div>
+        <label class="selector-rol">
+            Rol
+            <!-- Seleccion de rol sin autenticacion: deuda tecnica aceptada (ADR-002) -->
+            <select id="rol">
+                <option value="Recepcionista">Recepcionista</option>
+                <option value="Técnico">Técnico</option>
+                <option value="Encargado_Compras">Encargado de Compras</option>
+                <option value="Gerente">Gerente</option>
+            </select>
+        </label>
+    </header>
+
+    <nav class="pestanas" id="pestanas">
+        <button data-pantalla="ordenes">Registrar OT</button>
+        <button data-pantalla="historial">Historial</button>
+        <button data-pantalla="inventario">Inventario</button>
+        <button data-pantalla="alertas">Alertas</button>
+        <button data-pantalla="comparacion">Comparación</button>
+        <button data-pantalla="reportes">Reportes</button>
+        <button data-pantalla="asistente">Asistente IA</button>
+    </nav>
+
+    <div id="spinner" class="spinner" hidden role="status" aria-live="polite">
+        <span class="rueda"></span> Procesando solicitud…
+    </div>
+
+    <main>
+        <!-- Registro de OT (Requisito 1) -->
+        <section id="pantalla-ordenes" class="pantalla" hidden>
+            <h2>Registrar Orden de Trabajo</h2>
+            <form id="form-ot" class="formulario" novalidate>
+                <label>Nombre del cliente <input name="nombre" maxlength="100" required></label>
+                <label>DNI <input name="dni" maxlength="8" inputmode="numeric" required></label>
+                <label>Placa <input name="placa" maxlength="10" required></label>
+                <label>Marca <input name="marca" maxlength="50" required></label>
+                <label>Modelo <input name="modelo" maxlength="50" required></label>
+                <label>Año <input name="anio" type="number" min="1900" required></label>
+                <label>Kilometraje <input name="kilometraje" type="number" min="0" max="999999" required></label>
+                <label>Técnico asignado
+                    <select name="tecnico" required>
+                        <option value="">Seleccione…</option>
+                        <option>Luis Pachas</option>
+                        <option>Luis Luna</option>
+                        <option>Miguel Torres</option>
+                    </select>
+                </label>
+                <label class="ancho">Motivo de ingreso <textarea name="motivo" maxlength="500" rows="2" required></textarea></label>
+                <label class="ancho">Observaciones (opcional) <textarea name="observaciones" maxlength="1000" rows="2"></textarea></label>
+                <p class="nota ancho">Use solo datos simulados (Ley N.° 29733).</p>
+                <button type="submit">Registrar</button>
+            </form>
+            <div id="resultado-ot" class="resultado"></div>
+        </section>
+
+        <!-- Historial (Requisito 2) -->
+        <section id="pantalla-historial" class="pantalla" hidden>
+            <h2>Historial de cliente y vehículo</h2>
+            <form id="form-historial" class="busqueda">
+                <input name="q" placeholder="Placa (ej. ABC-123) o DNI (8 dígitos)" maxlength="10">
+                <button type="submit">Buscar</button>
+            </form>
+            <div id="resultado-historial" class="resultado"></div>
+            <div id="detalle-historial" class="resultado"></div>
+        </section>
+
+        <!-- Inventario (Requisito 3) -->
+        <section id="pantalla-inventario" class="pantalla" hidden>
+            <h2>Consulta de stock</h2>
+            <form id="form-inventario" class="busqueda">
+                <input name="q" placeholder="Nombre o código del repuesto" maxlength="100">
+                <button type="submit">Consultar</button>
+            </form>
+            <div id="resultado-inventario" class="resultado"></div>
+        </section>
+
+        <!-- Alertas (Requisito 4) -->
+        <section id="pantalla-alertas" class="pantalla" hidden>
+            <h2>Alertas de stock mínimo</h2>
+            <button id="btn-alertas" type="button" class="secundario">Actualizar</button>
+            <div id="resultado-alertas" class="resultado"></div>
+        </section>
+
+        <!-- Comparacion (Requisito 5) -->
+        <section id="pantalla-comparacion" class="pantalla" hidden>
+            <h2>Comparar conteo físico</h2>
+            <form id="form-comparacion">
+                <div id="filas-conteo"></div>
+                <div class="acciones">
+                    <button type="button" id="btn-agregar-fila" class="secundario">+ Agregar repuesto</button>
+                    <button type="submit">Comparar</button>
+                </div>
+            </form>
+            <div id="resultado-comparacion" class="resultado"></div>
+        </section>
+
+        <!-- Reportes (Requisito 6) -->
+        <section id="pantalla-reportes" class="pantalla" hidden>
+            <h2>Reporte de OT por técnico</h2>
+            <form id="form-reportes" class="busqueda">
+                <label>Desde <input type="date" name="fecha_inicio" required></label>
+                <label>Hasta <input type="date" name="fecha_fin" required></label>
+                <button type="submit">Generar</button>
+            </form>
+            <div id="resultado-reportes" class="resultado"></div>
+        </section>
+
+        <!-- Asistente IA (Requisito 9) -->
+        <section id="pantalla-asistente" class="pantalla" hidden>
+            <h2>Asistente IA</h2>
+            <form id="form-asistente" class="formulario">
+                <label class="ancho">Pregunta
+                    <textarea name="pregunta" maxlength="500" rows="3" placeholder="Ej.: ¿Hay pastillas de freno en stock?"></textarea>
+                </label>
+                <button type="submit">Preguntar</button>
+            </form>
+            <div id="resultado-asistente" class="resultado"></div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Entorno virtual
+.venv/
+venv/
+ENV/
+
+# Variables de entorno
+.env
+
+# Base de datos local
+data/taller.db
+data/taller.db-shm
+data/taller.db-wal
+data/taller.db-journal
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pruebas y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribución
+dist/
+build/
+*.egg-info/
+
+# Hypothesis
+.hypothesis/
+
+# Material del curso (no se versiona)
+*.docx
+!docs/S7_Guia_de_laboratorio_LosPapus.docx
