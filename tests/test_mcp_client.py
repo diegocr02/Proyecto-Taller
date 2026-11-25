@@ -132,7 +132,7 @@ def test_mcp_servidor_real_no_configurado_eleva_excepcion(cliente_mcp_con_datos)
 
 def test_mcp_buscar_historial_placa_sin_guion(cliente_mcp_con_datos):
     """La placa se encuentra con o sin guion y sin distinguir mayusculas."""
-    assert len(cliente_mcp_con_datos.buscar_historial("abc123", tipo="placa")) == 1
+    assert len(cliente_mcp_con_datos.buscar_historial("abc123", tipo="placa")) == 2  # OT 1 y OT 14 de los datos simulados
 
 
 def test_mcp_obtener_ot(cliente_mcp_con_datos):

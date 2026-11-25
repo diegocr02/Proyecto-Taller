@@ -128,4 +128,4 @@ def test_historial_detalle_inexistente(cliente_con_mcp, ruta_db_poblada):
 def test_historial_busqueda_valida(cliente_con_mcp, ruta_db_poblada, criterio):
     respuesta = cliente_con_mcp(McpEspia(ruta_db=ruta_db_poblada)).get("/historial", params={"q": criterio})
     assert respuesta.status_code == 200
-    assert len(respuesta.json()["ordenes"]) == 1
+    assert len(respuesta.json()["ordenes"]) == 2  # OT 1 y OT 14 de los datos simulados
