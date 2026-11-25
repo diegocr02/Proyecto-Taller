@@ -16,6 +16,8 @@ logger = logging.getLogger("asistente_taller")
 
 TIMEOUT_POR_DEFECTO = 20.0  # segundos (valor inicial propuesto en ADR-003)
 MODELO_POR_DEFECTO = "gemini-3.5-flash-lite"
+MODELO_OPENAI_POR_DEFECTO = "gpt-4o-mini"  # el modelo de OpenAI mas rapido para respuestas cortas
+URL_OPENAI = "https://api.openai.com/v1/chat/completions"
 
 
 @dataclass
@@ -47,9 +49,46 @@ class GeminiGateway:
         if timeout >= 30:
             raise ValueError("El timeout de GeminiGateway debe ser menor a 30 segundos")
         self.timeout = timeout
-        self.modelo = modelo or os.getenv("GEMINI_MODEL", MODELO_POR_DEFECTO)
+        self._modelo_fijo = modelo
+        self._cliente_http = None  # conexion reutilizada con OpenAI (respuestas mas rapidas)
         # generador permite inyectar un doble de prueba; por defecto se usa la API real
-        self._generador = generador or self._generar_con_api
+        self._generador = generador or self._generar_auto
+
+    @staticmethod
+    def usa_openai() -> bool:
+        """Si hay clave de OpenAI se usa ChatGPT; si no, Gemini (se decide en cada consulta)."""
+        return bool(os.getenv("OPENAI_API_KEY"))
+
+    @property
+    def modelo(self) -> str:
+        if self._modelo_fijo:
+            return self._modelo_fijo
+        if self.usa_openai():
+            return os.getenv("OPENAI_MODEL", MODELO_OPENAI_POR_DEFECTO)
+        return os.getenv("GEMINI_MODEL", MODELO_POR_DEFECTO)
+
+    def _generar_auto(self, prompt: str) -> str:
+        return self._generar_con_openai(prompt) if self.usa_openai() else self._generar_con_api(prompt)
+
+    def _generar_con_openai(self, prompt: str) -> str:
+        """Llama a la API de OpenAI (ChatGPT) con httpx; la clave sale de OPENAI_API_KEY."""
+        import httpx
+
+        if self._cliente_http is None:
+            self._cliente_http = httpx.Client(timeout=self.timeout)
+        respuesta = self._cliente_http.post(
+            URL_OPENAI,
+            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
+            json={
+                "model": self.modelo,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_completion_tokens": 500,
+            },
+        )
+        if respuesta.status_code != 200:
+            raise RuntimeError(f"OpenAI {respuesta.status_code}: {respuesta.text[:200]}")
+        return respuesta.json()["choices"][0]["message"]["content"]
 
     def _generar_con_api(self, prompt: str) -> str:
         """Llama a Gemini API usando la clave de la variable de entorno."""

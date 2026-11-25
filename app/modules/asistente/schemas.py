@@ -3,7 +3,7 @@
 Esquemas Pydantic para el modulo de Asistente IA (Requisito 9).
 """
 
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 Rol = Literal["Recepcionista", "Técnico", "Encargado_Compras", "Gerente"]
@@ -14,6 +14,7 @@ class ConsultaAsistente(BaseModel):
 
     pregunta: str = Field(..., min_length=1, max_length=500, description="Pregunta del usuario")
     rol: Rol
+    sesion: Optional[str] = Field(default=None, max_length=64, description="Identificador de la conversacion (memoria)")
 
 
 class RespuestaAsistente(BaseModel):
@@ -22,3 +23,4 @@ class RespuestaAsistente(BaseModel):
     id_consulta: str
     asistencia: Optional[str] = None
     mensaje: Optional[str] = None
+    herramientas: List[str] = Field(default_factory=list, description="Herramientas MCP que uso el agente")

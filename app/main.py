@@ -6,6 +6,7 @@ monta archivos estaticos del frontend y registra los routers de los modulos.
 """
 
 import os
+import threading
 import sys
 import logging
 from contextlib import asynccontextmanager
@@ -38,7 +39,7 @@ def verificar_clave_gemini() -> None:
     Termina el proceso con codigo distinto de cero si no esta definida,
     a menos que se indique MODO_TEST=1 para entornos de pruebas aislados.
     """
-    clave = os.getenv("GEMINI_API_KEY")
+    clave = os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY")
     modo_test = os.getenv("MODO_TEST", "0") == "1"
 
     if not clave and not modo_test:
@@ -60,6 +61,10 @@ async def lifespan(app: FastAPI):
     """Ciclo de vida de la aplicacion FastAPI."""
     verificar_clave_gemini()
     preparar_base_datos()
+    if os.getenv("MODO_TEST", "0") != "1":
+        # Enciende el servidor MCP del agente en segundo plano: la primera pregunta ya no espera
+        from agente.agente import obtener_agente
+        threading.Thread(target=obtener_agente().precalentar, daemon=True).start()
     logger.info("Aplicacion iniciada exitosamente.")
     yield
     logger.info("Aplicacion detenida.")
