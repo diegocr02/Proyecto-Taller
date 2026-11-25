@@ -5,133 +5,289 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jorge Motors - Asistente de Gestión de Taller y Repuestos</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css?v=3">
 </head>
 <body>
+    <!-- Iconos (estilo línea) reutilizables con <svg><use href="#i-..."/></svg> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17h-1a2 2 0 0 1-2-2v-3l2.5-5a2 2 0 0 1 1.8-1h8.4a2 2 0 0 1 1.6.8L20 10l1.6.6A2 2 0 0 1 23 12.5V15a2 2 0 0 1-2 2h-1"/><circle cx="7.5" cy="17" r="2"/><circle cx="17.5" cy="17" r="2"/><path d="M9.5 17h6"/></symbol>
+            <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+            <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+            <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-9"/></symbol>
+            <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+            <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+            <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+            <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+            <symbol id="i-id" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16a3 3 0 0 1 6 0M15 10h3M15 14h3"/></symbol>
+            <symbol id="i-plate" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 12h2M11 12h2M16 12h2"/></symbol>
+            <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5M2 17l10 5 10-5"/></symbol>
+            <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+            <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/></symbol>
+            <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L22 14l-8 8-2.3-2.3a4 4 0 0 0-5-5L2 10l8-8z" transform="scale(.9) translate(1.3 1.3)"/></symbol>
+            <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></symbol>
+            <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+            <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+            <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+            <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 21h14M3 8l4-4 4 4M3 8l4 8 4-8M13 8l4-4 4 4M13 8l4 8 4-8" transform="scale(.92) translate(1 1)"/></symbol>
+        </defs>
+    </svg>
+
     <header class="cabecera">
-        <div>
-            <h1>Jorge Motors</h1>
-            <p>Sistema de Gestión de Taller y Repuestos</p>
+        <div class="marca">
+            <div class="logo" aria-hidden="true"><svg><use href="#i-car"/></svg></div>
+            <div>
+                <h1>Jorge Motors</h1>
+                <p>Sistema de Gestión de Taller y Repuestos</p>
+            </div>
         </div>
-        <label class="selector-rol">
-            Rol
-            <!-- Seleccion de rol sin autenticacion: deuda tecnica aceptada (ADR-002) -->
-            <select id="rol">
-                <option value="Recepcionista">Recepcionista</option>
-                <option value="Técnico">Técnico</option>
-                <option value="Encargado_Compras">Encargado de Compras</option>
-                <option value="Gerente">Gerente</option>
-            </select>
-        </label>
+        <div class="cabecera-acciones">
+            <label class="selector-rol">
+                <span>Rol</span>
+                <!-- Seleccion de rol sin autenticacion: deuda tecnica aceptada (ADR-002) -->
+                <select id="rol">
+                    <option value="Recepcionista">Recepcionista</option>
+                    <option value="Técnico">Técnico</option>
+                    <option value="Encargado_Compras">Encargado de Compras</option>
+                    <option value="Gerente">Gerente</option>
+                </select>
+            </label>
+            <button type="button" class="icono-boton" id="btn-campana" aria-label="Ver alertas">
+                <svg><use href="#i-bell"/></svg><span class="punto" id="punto-alertas" hidden></span>
+            </button>
+            <div class="avatar" aria-hidden="true"><svg><use href="#i-user"/></svg></div>
+        </div>
     </header>
 
     <nav class="pestanas" id="pestanas">
-        <button data-pantalla="ordenes">Registrar OT</button>
-        <button data-pantalla="historial">Historial</button>
-        <button data-pantalla="inventario">Inventario</button>
-        <button data-pantalla="alertas">Alertas</button>
-        <button data-pantalla="comparacion">Comparación</button>
-        <button data-pantalla="reportes">Reportes</button>
-        <button data-pantalla="asistente">Asistente IA</button>
+        <button data-pantalla="ordenes"><svg><use href="#i-plus"/></svg>Registrar OT</button>
+        <button data-pantalla="historial"><svg><use href="#i-clock"/></svg>Historial</button>
+        <button data-pantalla="inventario"><svg><use href="#i-box"/></svg>Inventario</button>
+        <button data-pantalla="alertas"><svg><use href="#i-alert"/></svg>Alertas<span class="contador" id="contador-alertas" hidden></span></button>
+        <button data-pantalla="comparacion"><svg><use href="#i-chart"/></svg>Comparación</button>
+        <button data-pantalla="reportes"><svg><use href="#i-file"/></svg>Reportes</button>
+        <button data-pantalla="asistente"><svg><use href="#i-spark"/></svg>Asistente IA</button>
     </nav>
 
     <div id="spinner" class="spinner" hidden role="status" aria-live="polite">
         <span class="rueda"></span> Procesando solicitud…
     </div>
+    <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
     <main>
         <!-- Registro de OT (Requisito 1) -->
         <section id="pantalla-ordenes" class="pantalla" hidden>
-            <h2>Registrar Orden de Trabajo</h2>
-            <form id="form-ot" class="formulario" novalidate>
-                <label>Nombre del cliente <input name="nombre" maxlength="100" required></label>
-                <label>DNI <input name="dni" maxlength="8" inputmode="numeric" required></label>
-                <label>Placa <input name="placa" maxlength="10" required></label>
-                <label>Marca <input name="marca" maxlength="50" required></label>
-                <label>Modelo <input name="modelo" maxlength="50" required></label>
-                <label>Año <input name="anio" type="number" min="1900" required></label>
-                <label>Kilometraje <input name="kilometraje" type="number" min="0" max="999999" required></label>
-                <label>Técnico asignado
-                    <select name="tecnico" required>
-                        <option value="">Seleccione…</option>
-                        <option>Luis Pachas</option>
-                        <option>Luis Luna</option>
-                        <option>Miguel Torres</option>
-                    </select>
-                </label>
-                <label class="ancho">Motivo de ingreso <textarea name="motivo" maxlength="500" rows="2" required></textarea></label>
-                <label class="ancho">Observaciones (opcional) <textarea name="observaciones" maxlength="1000" rows="2"></textarea></label>
-                <p class="nota ancho">Use solo datos simulados (Ley N.° 29733).</p>
-                <button type="submit">Registrar</button>
-            </form>
-            <div id="resultado-ot" class="resultado"></div>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo"><svg><use href="#i-file"/></svg></div>
+                <div><h2>Registrar Orden de Trabajo</h2><p>Complete los datos del cliente, vehículo y servicio.</p></div>
+            </div>
+            <div class="dos-columnas">
+                <form id="form-ot" class="tarjeta" novalidate>
+                    <div class="seccion-form">
+                        <div class="seccion-cabecera"><h3><svg><use href="#i-user"/></svg>Datos del cliente</h3><span class="nota"><b class="req">*</b> Campos obligatorios</span></div>
+                        <div class="rejilla r2">
+                            <label class="campo">Nombre del cliente <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-user"/></svg><input name="nombre" maxlength="100" placeholder="Ej: Juan Pérez" required data-grupo="cliente"></span></label>
+                            <label class="campo">DNI <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-id"/></svg><input name="dni" maxlength="8" inputmode="numeric" placeholder="Ej: 12345678" required data-grupo="cliente"></span></label>
+                        </div>
+                    </div>
+                    <div class="seccion-form">
+                        <div class="seccion-cabecera"><h3><svg><use href="#i-car"/></svg>Datos del vehículo</h3></div>
+                        <div class="rejilla r5">
+                            <label class="campo">Placa <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-plate"/></svg><input name="placa" maxlength="10" placeholder="Ej: ABC-123" required data-grupo="vehiculo"></span></label>
+                            <label class="campo">Marca <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-car"/></svg><input name="marca" maxlength="50" list="lista-marcas" placeholder="Seleccione o escriba" required data-grupo="vehiculo"></span></label>
+                            <label class="campo">Modelo <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-layers"/></svg><input name="modelo" maxlength="50" placeholder="Ej: Hilux" required data-grupo="vehiculo"></span></label>
+                            <label class="campo">Año <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-cal"/></svg><input name="anio" type="number" min="1900" placeholder="Ej: 2020" required data-grupo="vehiculo"></span></label>
+                            <label class="campo">Kilometraje <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-gauge"/></svg><input name="kilometraje" type="number" min="0" max="999999" placeholder="Ej: 85000" required data-grupo="vehiculo"></span></label>
+                        </div>
+                        <datalist id="lista-marcas">
+                            <option>Toyota</option><option>Hyundai</option><option>Kia</option><option>Nissan</option>
+                            <option>Chevrolet</option><option>Suzuki</option><option>Mitsubishi</option><option>Mazda</option>
+                            <option>Volkswagen</option><option>Honda</option><option>Ford</option>
+                        </datalist>
+                    </div>
+                    <div class="seccion-form">
+                        <div class="seccion-cabecera"><h3><svg><use href="#i-wrench"/></svg>Detalle del servicio</h3></div>
+                        <div class="rejilla">
+                            <label class="campo">Técnico asignado <b class="req">*</b>
+                                <span class="entrada"><svg><use href="#i-user"/></svg>
+                                    <select name="tecnico" required data-grupo="servicio">
+                                        <option value="">Seleccione un técnico…</option>
+                                        <option>Luis Pachas</option>
+                                        <option>Luis Luna</option>
+                                        <option>Miguel Torres</option>
+                                    </select></span></label>
+                            <label class="campo">Motivo de ingreso <b class="req">*</b>
+                                <span class="entrada area"><svg><use href="#i-msg"/></svg><textarea name="motivo" maxlength="500" rows="2" placeholder="Describa el problema o servicio solicitado…" required data-grupo="servicio"></textarea></span></label>
+                            <label class="campo">Observaciones
+                                <span class="entrada area"><svg><use href="#i-file"/></svg><textarea name="observaciones" maxlength="1000" rows="2" placeholder="Información adicional (opcional)"></textarea></span></label>
+                        </div>
+                    </div>
+                    <div class="pie-form">
+                        <p class="nota"><svg class="mini"><use href="#i-info"/></svg>Use solo datos simulados (Ley N.° 29733).</p>
+                        <div class="acciones">
+                            <button type="reset" class="fantasma">Cancelar</button>
+                            <button type="submit"><svg><use href="#i-check"/></svg>Registrar OT</button>
+                        </div>
+                    </div>
+                    <div id="resultado-ot" class="resultado"></div>
+                </form>
+
+                <aside class="tarjeta resumen">
+                    <h3><svg><use href="#i-file"/></svg>Resumen de la OT</h3>
+                    <div class="destacado">
+                        <span>Vehículo</span>
+                        <strong id="res-vehiculo">—</strong>
+                    </div>
+                    <dl class="resumen-lista">
+                        <div><dt><svg><use href="#i-clock"/></svg>Estado</dt><dd><span class="insignia aviso">Por registrar</span></dd></div>
+                        <div><dt><svg><use href="#i-user"/></svg>Cliente</dt><dd id="res-cliente">—</dd></div>
+                        <div><dt><svg><use href="#i-wrench"/></svg>Técnico</dt><dd id="res-tecnico">Sin asignar</dd></div>
+                    </dl>
+                    <h4>Progreso de registro</h4>
+                    <ul class="progreso" id="progreso-ot">
+                        <li data-grupo="cliente"><span class="circulo"></span>Datos del cliente<b>0 / 2</b></li>
+                        <li data-grupo="vehiculo"><span class="circulo"></span>Datos del vehículo<b>0 / 5</b></li>
+                        <li data-grupo="servicio"><span class="circulo"></span>Detalle del servicio<b>0 / 2</b></li>
+                    </ul>
+                    <div class="barra"><span id="barra-ot"></span></div>
+                    <p class="aviso-caja" id="aviso-ot"><svg class="mini"><use href="#i-info"/></svg>Completa todos los campos obligatorios para registrar la OT.</p>
+                </aside>
+            </div>
         </section>
 
         <!-- Historial (Requisito 2) -->
         <section id="pantalla-historial" class="pantalla" hidden>
-            <h2>Historial de cliente y vehículo</h2>
-            <form id="form-historial" class="busqueda">
-                <input name="q" placeholder="Placa (ej. ABC-123) o DNI (8 dígitos)" maxlength="10">
-                <button type="submit">Buscar</button>
-            </form>
-            <div id="resultado-historial" class="resultado"></div>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo"><svg><use href="#i-clock"/></svg></div>
+                <div><h2>Historial de cliente y vehículo</h2><p>Busque por placa o DNI para ver las órdenes de trabajo anteriores.</p></div>
+            </div>
+            <div class="tarjeta">
+                <form id="form-historial" class="busqueda">
+                    <span class="entrada grande"><svg><use href="#i-search"/></svg><input name="q" placeholder="Placa (ej. ABC-123) o DNI (8 dígitos)" maxlength="10"></span>
+                    <button type="submit"><svg><use href="#i-search"/></svg>Buscar</button>
+                </form>
+                <div id="resultado-historial" class="resultado"></div>
+            </div>
             <div id="detalle-historial" class="resultado"></div>
         </section>
 
         <!-- Inventario (Requisito 3) -->
         <section id="pantalla-inventario" class="pantalla" hidden>
-            <h2>Consulta de stock</h2>
-            <form id="form-inventario" class="busqueda">
-                <input name="q" placeholder="Nombre o código del repuesto" maxlength="100">
-                <button type="submit">Consultar</button>
-            </form>
-            <div id="resultado-inventario" class="resultado"></div>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo"><svg><use href="#i-box"/></svg></div>
+                <div><h2>Consulta de stock</h2><p>Encuentre repuestos por nombre o código.</p></div>
+            </div>
+            <div class="tarjeta">
+                <form id="form-inventario" class="busqueda">
+                    <span class="entrada grande"><svg><use href="#i-search"/></svg><input name="q" placeholder="Nombre o código del repuesto" maxlength="100"></span>
+                    <button type="submit"><svg><use href="#i-search"/></svg>Consultar</button>
+                </form>
+                <div class="chips" id="chips-inventario">
+                    <button type="button" class="chip">Pastillas</button>
+                    <button type="button" class="chip">Filtro</button>
+                    <button type="button" class="chip">Aceite</button>
+                    <button type="button" class="chip">Bujía</button>
+                    <button type="button" class="chip">Batería</button>
+                </div>
+                <div id="resultado-inventario" class="resultado"></div>
+            </div>
         </section>
 
         <!-- Alertas (Requisito 4) -->
         <section id="pantalla-alertas" class="pantalla" hidden>
-            <h2>Alertas de stock mínimo</h2>
-            <button id="btn-alertas" type="button" class="secundario">Actualizar</button>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo rojo"><svg><use href="#i-alert"/></svg></div>
+                <div><h2>Alertas de stock mínimo</h2><p>Repuestos con cantidad igual o menor a su stock mínimo.</p></div>
+                <button id="btn-alertas" type="button" class="secundario empuja"><svg><use href="#i-refresh"/></svg>Actualizar</button>
+            </div>
             <div id="resultado-alertas" class="resultado"></div>
         </section>
 
         <!-- Comparacion (Requisito 5) -->
         <section id="pantalla-comparacion" class="pantalla" hidden>
-            <h2>Comparar conteo físico</h2>
-            <form id="form-comparacion">
-                <div id="filas-conteo"></div>
-                <div class="acciones">
-                    <button type="button" id="btn-agregar-fila" class="secundario">+ Agregar repuesto</button>
-                    <button type="submit">Comparar</button>
-                </div>
-            </form>
-            <div id="resultado-comparacion" class="resultado"></div>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo"><svg><use href="#i-scale"/></svg></div>
+                <div><h2>Comparar conteo físico</h2><p>Ingrese lo contado en almacén y compárelo con el sistema.</p></div>
+            </div>
+            <div class="tarjeta">
+                <form id="form-comparacion">
+                    <div class="cabecera-conteo"><span>Código del repuesto</span><span>Conteo físico</span><span></span></div>
+                    <div id="filas-conteo"></div>
+                    <div class="acciones">
+                        <button type="button" id="btn-agregar-fila" class="secundario"><svg><use href="#i-plus"/></svg>Agregar repuesto</button>
+                        <button type="submit"><svg><use href="#i-scale"/></svg>Comparar</button>
+                    </div>
+                </form>
+                <div id="resultado-comparacion" class="resultado"></div>
+            </div>
         </section>
 
         <!-- Reportes (Requisito 6) -->
         <section id="pantalla-reportes" class="pantalla" hidden>
-            <h2>Reporte de OT por técnico</h2>
-            <form id="form-reportes" class="busqueda">
-                <label>Desde <input type="date" name="fecha_inicio" required></label>
-                <label>Hasta <input type="date" name="fecha_fin" required></label>
-                <button type="submit">Generar</button>
-            </form>
-            <div id="resultado-reportes" class="resultado"></div>
+            <div class="titulo-pantalla">
+                <div class="icono-titulo"><svg><use href="#i-chart"/></svg></div>
+                <div><h2>Reporte de OT por técnico</h2><p>Elija un rango de fechas para ver la carga de cada técnico.</p></div>
+            </div>
+            <div class="tarjeta">
+                <form id="form-reportes" class="busqueda">
+                    <label class="campo">Desde <span class="entrada"><svg><use href="#i-cal"/></svg><input type="date" name="fecha_inicio" required></span></label>
+                    <label class="campo">Hasta <span class="entrada"><svg><use href="#i-cal"/></svg><input type="date" name="fecha_fin" required></span></label>
+                    <button type="submit"><svg><use href="#i-chart"/></svg>Generar</button>
+                </form>
+                <div id="resultado-reportes" class="resultado"></div>
+            </div>
         </section>
 
         <!-- Asistente IA (Requisito 9) -->
         <section id="pantalla-asistente" class="pantalla" hidden>
-            <h2>Asistente IA</h2>
-            <form id="form-asistente" class="formulario">
-                <label class="ancho">Pregunta
-                    <textarea name="pregunta" maxlength="500" rows="3" placeholder="Ej.: ¿Hay pastillas de freno en stock?"></textarea>
-                </label>
-                <button type="submit">Preguntar</button>
-            </form>
-            <div id="resultado-asistente" class="resultado"></div>
+            <div class="chat-layout">
+                <aside class="tarjeta chat-lateral">
+                    <div class="mascota"><img src="/static/img/jorgebot.webp" alt="JorgeBot, mascota del taller"></div>
+                    <h3>JorgeBot</h3>
+                    <p class="en-linea"><span></span>Asistente IA del Taller</p>
+                    <p class="nota centrada">Asistente de inteligencia artificial: consulta inventario, órdenes de trabajo, historial y reportes.</p>
+                    <button type="button" id="btn-nueva-conversacion" class="secundario ancho"><svg><use href="#i-plus"/></svg>Nueva conversación</button>
+                    <h4>Conversaciones recientes</h4>
+                    <ul class="recientes" id="lista-recientes"></ul>
+                </aside>
+                <div class="tarjeta chat">
+                    <div class="chat-cabecera">
+                        <img class="avatar-bot" src="/static/img/jorgebot.webp" alt="">
+                        <div><strong>JorgeBot</strong><p class="en-linea"><span></span>En línea</p></div>
+                        <button type="button" class="icono-boton empuja" id="btn-limpiar-chat" aria-label="Borrar conversación"><svg><use href="#i-trash"/></svg></button>
+                    </div>
+                    <div class="chat-mensajes" id="resultado-asistente" aria-live="polite"></div>
+                    <div class="chips sugerencias" id="sugerencias">
+                        <button type="button" class="chip" data-pregunta="¿Qué repuestos están en stock mínimo y debo reponer?"><svg><use href="#i-box"/></svg>Repuestos por reponer</button>
+                        <button type="button" class="chip" data-pregunta="¿Hay pastillas de freno en stock?"><svg><use href="#i-wrench"/></svg>Pastillas de freno</button>
+                        <button type="button" class="chip" data-pregunta="¿Qué órdenes de trabajo están pendientes?"><svg><use href="#i-clock"/></svg>Órdenes pendientes</button>
+                        <button type="button" class="chip" data-pregunta="¿Cuántas órdenes atendió cada técnico este mes?"><svg><use href="#i-chart"/></svg>Resumen por técnico</button>
+                    </div>
+                    <form id="form-asistente" class="chat-entrada">
+                        <textarea name="pregunta" maxlength="500" rows="1" placeholder="Escribe tu consulta… (Enter para enviar)"></textarea>
+                        <button type="submit" class="enviar" aria-label="Enviar"><svg><use href="#i-send"/></svg></button>
+                    </form>
+                </div>
+            </div>
         </section>
     </main>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=3"></script>
 </body>
 </html>
