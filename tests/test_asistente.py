@@ -1,6 +1,7 @@
 # Historia: H-09
 """
-Pruebas del Modulo Asistente IA (Requisito 9): propiedad 17 y degradacion controlada.
+Pruebas del Modulo Asistente IA (Requisito 9): propiedad 17, degradacion controlada,
+memoria por sesion y herramientas usadas. El agente usa un modelo falso (sin llamar a la API real).
 """
 
 import json
@@ -11,8 +12,8 @@ import pytest
 from hypothesis import given, strategies as st
 
 from tests.conftest import McpEspia, crear_db_temporal, eliminar_db
+from agente.agente import AgenteTaller, obtener_agente
 from app.modules.asistente.repositorio import RepositorioTrazabilidad, obtener_repositorio_trazabilidad
-from app.shared.gemini_gateway import GeminiGateway, obtener_gateway_gemini
 
 ROLES = ["Recepcionista", "Técnico", "Encargado_Compras", "Gerente"]
 
@@ -24,11 +25,32 @@ def ruta_db():
     eliminar_db(ruta)
 
 
-def crear_cliente(cliente_con_mcp, ruta, generador, mcp=None):
+def agente_falso(responder_texto="Respuesta simulada", falla=None, herramienta=None):
+    """Agente con modelo falso: opcionalmente pide una herramienta y luego responde."""
+    vistos = []
+
+    def modelo(mensajes, herramientas):
+        vistos.append(mensajes)
+        if falla:
+            raise falla
+        if herramienta and mensajes[-1]["role"] == "user":
+            return {"content": None, "tool_calls": [{"id": "1", "function": {"name": herramienta, "arguments": "{}"}}]}
+        return {"content": responder_texto}
+
+    agente = AgenteTaller(
+        llamar_modelo=modelo,
+        ejecutar_herramienta=lambda nombre, args: json.dumps({"ok": nombre}),
+        listar_herramientas=lambda: [],
+    )
+    agente.mensajes_vistos = vistos
+    return agente
+
+
+def crear_cliente(cliente_con_mcp, ruta, agente):
     return cliente_con_mcp(
-        mcp or McpEspia(ruta_db=ruta),
+        McpEspia(ruta_db=ruta),
         overrides={
-            obtener_gateway_gemini: GeminiGateway(generador=generador),
+            obtener_agente: agente,
             obtener_repositorio_trazabilidad: RepositorioTrazabilidad(ruta_db=ruta),
         },
     )
@@ -53,7 +75,7 @@ def test_propiedad_17_log_de_trazabilidad(cliente_con_mcp, consultas):
     """Cada consulta deja una entrada con los 6 campos y los N identificadores son distintos."""
     ruta = crear_db_temporal(poblar=True)
     try:
-        cliente = crear_cliente(cliente_con_mcp, ruta, lambda prompt: "Respuesta simulada")
+        cliente = crear_cliente(cliente_con_mcp, ruta, agente_falso())
         ids = []
         for pregunta, rol in consultas:
             respuesta = cliente.post("/asistente", json={"pregunta": pregunta, "rol": rol})
@@ -78,13 +100,10 @@ def test_propiedad_17_log_de_trazabilidad(cliente_con_mcp, consultas):
         eliminar_db(ruta)
 
 
-def test_asistente_degradado_cuando_gemini_falla(cliente_con_mcp, ruta_db):
-    """Si Gemini falla: 200 con asistencia null, mensaje y error registrado (Requisito 9.3)."""
-
-    def falla(prompt):
-        raise ConnectionError("Servicio Gemini caido")
-
-    respuesta = crear_cliente(cliente_con_mcp, ruta_db, falla).post(
+def test_asistente_degradado_cuando_el_modelo_falla(cliente_con_mcp, ruta_db):
+    """Si el modelo falla: 200 con asistencia null, mensaje y error registrado (Requisito 9.3)."""
+    agente = agente_falso(falla=ConnectionError("Servicio de IA caido"))
+    respuesta = crear_cliente(cliente_con_mcp, ruta_db, agente).post(
         "/asistente", json={"pregunta": "¿Hay filtros de aceite?", "rol": "Técnico"}
     )
     assert respuesta.status_code == 200
@@ -94,47 +113,42 @@ def test_asistente_degradado_cuando_gemini_falla(cliente_con_mcp, ruta_db):
 
     entrada = RepositorioTrazabilidad(ruta_db=ruta_db).obtener(cuerpo["id_consulta"])
     assert entrada["pregunta"] == "¿Hay filtros de aceite?"
-    assert entrada["error"] == "Servicio Gemini caido"
+    assert entrada["error"] == "Servicio de IA caido"
     assert entrada["respuesta"] is None
     datetime.fromisoformat(entrada["timestamp"])
 
 
-def test_asistente_incluye_contexto_mcp_en_el_prompt(cliente_con_mcp, ruta_db):
-    """El prompt enviado a Gemini incluye los datos del MCP relevantes a la pregunta."""
-    prompts = []
-
-    def captura(prompt):
-        prompts.append(prompt)
-        return "ok"
-
-    crear_cliente(cliente_con_mcp, ruta_db, captura).post(
-        "/asistente", json={"pregunta": "Historial de la placa ABC-123 y stock de bujia", "rol": "Técnico"}
+def test_asistente_informa_y_registra_la_herramienta_usada(cliente_con_mcp, ruta_db):
+    """Cuando el modelo pide una herramienta, la respuesta y la trazabilidad la indican."""
+    agente = agente_falso(responder_texto="Quedan 12 bujias", herramienta="buscar_repuesto")
+    respuesta = crear_cliente(cliente_con_mcp, ruta_db, agente).post(
+        "/asistente", json={"pregunta": "¿Hay bujias?", "rol": "Técnico"}
     )
-    assert "Bujia de iridio" in prompts[0]
-    assert "Mantenimiento preventivo 45k" in prompts[0]
+    cuerpo = respuesta.json()
+    assert cuerpo["asistencia"] == "Quedan 12 bujias"
+    assert cuerpo["herramientas"] == ["buscar_repuesto"]
+    contexto = json.loads(RepositorioTrazabilidad(ruta_db=ruta_db).obtener(cuerpo["id_consulta"])["contexto_mcp"])
+    assert contexto["herramientas"][0]["nombre"] == "buscar_repuesto"
 
 
-def test_asistente_funciona_sin_mcp(cliente_con_mcp, ruta_db):
-    """Si el MCP no esta disponible, el asistente sigue respondiendo y lo registra en el contexto."""
-    respuesta = crear_cliente(cliente_con_mcp, ruta_db, lambda p: "ok", mcp=McpEspia(caido=True)).post(
-        "/asistente", json={"pregunta": "stock de filtros", "rol": "Gerente"}
-    )
-    assert respuesta.status_code == 200
-    entrada = RepositorioTrazabilidad(ruta_db=ruta_db).obtener(respuesta.json()["id_consulta"])
-    assert "error_mcp" in json.loads(entrada["contexto_mcp"])
+def test_asistente_recuerda_la_conversacion_de_la_misma_sesion(cliente_con_mcp, ruta_db):
+    """Con el mismo identificador de sesion, el modelo recibe las preguntas anteriores."""
+    agente = agente_falso()
+    cliente = crear_cliente(cliente_con_mcp, ruta_db, agente)
+    cliente.post("/asistente", json={"pregunta": "¿Cuántas baterías quedan?", "rol": "Gerente", "sesion": "abc"})
+    cliente.post("/asistente", json={"pregunta": "¿Y cuál es el mínimo?", "rol": "Gerente", "sesion": "abc"})
+    textos = [m["content"] for m in agente.mensajes_vistos[-1]]
+    assert "¿Cuántas baterías quedan?" in textos
+
+    # Otra sesion empieza sin memoria, y borrar la conversacion la olvida
+    cliente.post("/asistente", json={"pregunta": "Hola", "rol": "Gerente", "sesion": "otra"})
+    assert "¿Cuántas baterías quedan?" not in [m["content"] for m in agente.mensajes_vistos[-1]]
+    assert cliente.delete("/asistente/sesion/abc?rol=Gerente").status_code == 204
+    cliente.post("/asistente", json={"pregunta": "¿Y?", "rol": "Gerente", "sesion": "abc"})
+    assert "¿Cuántas baterías quedan?" not in [m["content"] for m in agente.mensajes_vistos[-1]]
 
 
 @pytest.mark.parametrize("cuerpo", [{"pregunta": "hola", "rol": "Cliente"}, {"pregunta": "", "rol": "Gerente"}])
 def test_asistente_rechaza_rol_o_pregunta_invalidos(cliente_con_mcp, ruta_db, cuerpo):
-    respuesta = crear_cliente(cliente_con_mcp, ruta_db, lambda p: "ok").post("/asistente", json=cuerpo)
+    respuesta = crear_cliente(cliente_con_mcp, ruta_db, agente_falso()).post("/asistente", json=cuerpo)
     assert respuesta.status_code == 422
-
-
-def test_contexto_etiqueta_el_historial_por_placa_y_dni(ruta_db):
-    """El historial enviado a la IA indica a que placa o DNI pertenece cada lista de OT."""
-    from app.modules.asistente.router import obtener_contexto
-
-    contexto = obtener_contexto("¿Qué tienen ABC-123 y el DNI 10000002?", McpEspia(ruta_db=ruta_db))
-    historial = contexto["historial"]
-    assert historial["OT del vehiculo con placa ABC-123"][0]["motivo"] == "Mantenimiento preventivo 45k"
-    assert historial["OT del cliente con DNI 10000002"][0]["motivo"] == "Ruido al frenar"

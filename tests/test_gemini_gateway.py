@@ -44,6 +44,7 @@ def test_gateway_respuesta_vacia_es_error():
 def test_gateway_sin_clave_retorna_error(monkeypatch):
     """La clave se lee solo de la variable de entorno; sin ella se degrada sin excepcion."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     resultado = GeminiGateway().generar_respuesta("pregunta")
     assert isinstance(resultado, GeminiError)
 

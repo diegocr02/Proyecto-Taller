@@ -6,3 +6,4 @@ google-genai==1.72.0
 pytest==9.1.1
 hypothesis==6.168.5
 pydantic==2.14.0
+mcp[cli]<2

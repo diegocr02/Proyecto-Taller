@@ -1,44 +1,63 @@
 # Asistente de Gestión de Taller y Repuestos · Jorge Motors
 
-Aplicación web (FastAPI + HTML/JS + SQLite) para registrar Órdenes de Trabajo, consultar historial y stock, ver alertas de stock mínimo, comparar el conteo físico, generar reportes por técnico y consultar un asistente con IA (Gemini). Todos los datos son simulados (Ley N.° 29733).
+Aplicación web (FastAPI + HTML/JS + SQLite) para registrar Órdenes de Trabajo, consultar historial y stock, ver alertas de stock mínimo, comparar el conteo físico, generar reportes por técnico y conversar con **JorgeBot**, un agente de IA que consulta la base de datos mediante herramientas MCP. Todos los datos son simulados (Ley N.° 29733).
 
 La documentación del proyecto está en `.kiro/steering/`, `.kiro/specs/asistente-taller-jorge-motors/` y `docs/`.
 
+## Proyecto final: agente JorgeBot
+
+| Entregable | Dónde está |
+|---|---|
+| Chat integrado en la aplicación | Pestaña «Asistente IA» (`frontend/`) |
+| Servidor MCP con 6 herramientas | `agente/servidor_mcp.py` |
+| Instrucciones del agente | `agente/instrucciones.txt` |
+| Agente (ruta B, Python) | `agente/agente.py` |
+| Puente chat → agente (equivale a `chat.php`) | `app/modules/asistente/router.py` |
+| Ficha del agente | `docs/ficha_agente.md` |
+| Tabla de 10 casos de prueba | `docs/casos_prueba.md` |
+| Guion de la demostración | `docs/guion_demo.md` |
+
 ## Puesta en marcha
 
-Requisitos: Python 3.11 o superior y una clave propia de Gemini (gratis en <https://aistudio.google.com/apikey>). La clave nunca se sube al repositorio.
+Requisitos: Python 3.10 o superior y una clave de IA. El agente usa la primera clave que encuentre en `.env`, en este orden: `OPENAI_API_KEY`, `GEMINI_API_KEY` (gratis en <https://aistudio.google.com/apikey>) o `GROQ_API_KEY` (contingencia). Las claves nunca se suben al repositorio (`.env` está en `.gitignore`).
 
 ```bash
 git clone https://github.com/diegocr02/Proyecto-Taller.git
 cd Proyecto-Taller
 git checkout develop
-python -m pip install -r requirements.txt
-cp .env.example .env          # y colocar una GEMINI_API_KEY válida en .env
-python data/seed.py           # opcional: la app crea data/taller.db al arrancar si no existe
-python -m uvicorn app.main:app --port 8000
+python -m pip install -r requirements.txt      # incluye mcp[cli]<2 (la versión 2 no es compatible)
+cp .env.example .env                           # y colocar una clave válida en .env
+python data/seed.py                            # carga 20 registros simulados por tabla
+python -m uvicorn app.main:app --port 8000     # sin --reload (en Windows impide encender el servidor MCP)
 ```
 
-Abrir <http://localhost:8000> y elegir el rol en la esquina superior.
-
-Si `GEMINI_API_KEY` no está definida, el proceso termina al arrancar (Requisito 8.3). Si la clave existe pero Gemini falla, solo el asistente responde "Asistencia de IA no disponible en este momento"; el resto del sistema sigue funcionando.
-
-Variables opcionales: `GEMINI_MODEL` (por defecto `gemini-3.5-flash-lite`).
+Abrir <http://localhost:8000>, elegir el rol en la esquina superior y entrar a «Asistente IA». En la terminal debe aparecer `Servidor MCP listo con 6 herramientas`: el agente enciende solo el servidor MCP, no hay que abrir otra terminal.
 
 En Windows (PowerShell), en lugar de `cp` use `copy .env.example .env` y edite `.env` con el Bloc de notas.
 
+Variables opcionales en `.env`: `OPENAI_MODEL` (por defecto `gpt-4o-mini`), `GEMINI_MODEL`, `GROQ_MODEL`, y `AGENTE_PROVEEDOR` (`openai`, `gemini` o `groq`) para elegir el modelo aunque haya varias claves.
+
+Si no hay ninguna clave, el proceso termina al arrancar (Requisito 8.3). Si la clave existe pero la IA falla, solo el asistente responde "Asistencia de IA no disponible en este momento"; el resto del sistema sigue funcionando.
+
+### Probar el servidor MCP solo
+
+```bash
+python agente/servidor_mcp.py      # queda esperando por stdio; se puede conectar desde VS Code como cliente MCP
+python -m pytest tests/test_agente.py
+```
+
 ## Preguntas de ejemplo para el asistente IA
 
-Elija el rol arriba a la derecha, abra la pantalla «Asistente IA» y pruebe:
-
-| Rol | Pregunta |
+| Pregunta | Herramienta MCP que usa |
 |---|---|
-| Encargado_Compras | ¿Qué repuestos tengo que comprar? |
-| Técnico | ¿Cuántas pastillas de freno hay en stock? |
-| Técnico | ¿Qué le hicieron al vehículo ABC-123? |
-| Recepcionista | ¿Qué OT tiene el cliente con DNI 10000002? |
-| Gerente | ¿En qué estado está el carro MNO-456 y quién lo atiende? |
+| ¿Cuántas baterías quedan? | `buscar_repuesto` |
+| ¿Qué repuestos debo reponer? | `repuestos_por_reponer` |
+| ¿Qué trabajos tiene la placa ABC-123? | `historial_vehiculo` |
+| ¿Qué órdenes tiene el DNI 10000002? | `historial_cliente` |
+| ¿Qué órdenes tiene pendientes Luis Luna? | `ordenes_pendientes` |
+| ¿Cuántas órdenes atendió cada técnico este mes? | `resumen_ordenes_por_tecnico` |
 
-El asistente solo responde con los datos del sistema (placas ABC-123, XYZ-789, MNO-456; DNI 10000001 a 10000003; repuestos REP-001 a REP-005). Si pregunta algo que no está en los datos, lo dice sin inventar.
+Recuerda la conversación ("¿Y cuál es su stock mínimo?"), rechaza temas ajenos al taller y no revela datos personales. Datos simulados: placas como ABC-123, XYZ-789, CDE-345; DNI 10000001 a 10000020; repuestos REP-001 a REP-020.
 
 ## Entregables de la sesión 7
 
@@ -54,4 +73,4 @@ Incluye pruebas unitarias, las 17 propiedades PBT de `design.md` (Hypothesis, 10
 
 ## Servidor MCP
 
-Hasta la semana 4, `McpReadClient` (`app/shared/mcp_client.py`) usa un stub que lee `data/taller.db` en modo solo lectura. Al conectar el Servidor MCP real, solo cambia ese archivo.
+El agente usa el servidor MCP real `agente/servidor_mcp.py` (6 herramientas, base en solo lectura). Las pantallas clásicas (inventario, historial, alertas) siguen usando `McpReadClient` (`app/shared/mcp_client.py`), que lee `data/taller.db` en modo solo lectura.
