@@ -9,7 +9,7 @@ La documentación del proyecto está en `.kiro/steering/`, `.kiro/specs/asistent
 | Entregable | Dónde está |
 |---|---|
 | Chat integrado en la aplicación | Pestaña «Asistente IA» (`frontend/`) |
-| Servidor MCP con 6 herramientas | `agente/servidor_mcp.py` |
+| Servidor MCP con 7 herramientas | `agente/servidor_mcp.py` |
 | Instrucciones del agente | `agente/instrucciones.txt` |
 | Agente (ruta B, Python) | `agente/agente.py` |
 | Puente chat → agente (equivale a `chat.php`) | `app/modules/asistente/router.py` |
@@ -31,7 +31,7 @@ python data/seed.py                            # carga 20 registros simulados po
 python -m uvicorn app.main:app --port 8000     # sin --reload (en Windows impide encender el servidor MCP)
 ```
 
-Abrir <http://localhost:8000>, elegir el rol en la esquina superior y entrar a «Asistente IA». En la terminal debe aparecer `Servidor MCP listo con 6 herramientas`: el agente enciende solo el servidor MCP, no hay que abrir otra terminal.
+Abrir <http://localhost:8000>, elegir el rol en la esquina superior y entrar a «Asistente IA». En la terminal debe aparecer `Servidor MCP listo con 7 herramientas`: el agente enciende solo el servidor MCP, no hay que abrir otra terminal.
 
 En Windows (PowerShell), en lugar de `cp` use `copy .env.example .env` y edite `.env` con el Bloc de notas.
 
@@ -50,6 +50,7 @@ python -m pytest tests/test_agente.py
 
 | Pregunta | Herramienta MCP que usa |
 |---|---|
+| ¿Qué hay de stock? / Dame el inventario | `listar_inventario` |
 | ¿Cuántas baterías quedan? | `buscar_repuesto` |
 | ¿Qué repuestos debo reponer? | `repuestos_por_reponer` |
 | ¿Qué trabajos tiene la placa ABC-123? | `historial_vehiculo` |
@@ -73,4 +74,4 @@ Incluye pruebas unitarias, las 17 propiedades PBT de `design.md` (Hypothesis, 10
 
 ## Servidor MCP
 
-El agente usa el servidor MCP real `agente/servidor_mcp.py` (6 herramientas, base en solo lectura). Las pantallas clásicas (inventario, historial, alertas) siguen usando `McpReadClient` (`app/shared/mcp_client.py`), que lee `data/taller.db` en modo solo lectura.
+El agente usa el servidor MCP real `agente/servidor_mcp.py` (7 herramientas, base en solo lectura). Las pantallas clásicas (inventario, historial, alertas) siguen usando `McpReadClient` (`app/shared/mcp_client.py`), que lee `data/taller.db` en modo solo lectura.

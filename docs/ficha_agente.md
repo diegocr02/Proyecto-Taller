@@ -7,8 +7,8 @@
 |---|---|
 | **Nombre del agente** | JorgeBot |
 | **Usuario** | Personal del taller Jorge Motors: recepcionista, técnicos, encargado de compras y gerente. |
-| **Preguntas que resuelve** | 1. ¿Cuánto stock queda de un repuesto y hay que reponerlo?<br>2. ¿Qué repuestos debo comprar o reponer?<br>3. ¿Qué trabajos se le hicieron a una placa? / ¿Qué órdenes tiene un DNI?<br>4. ¿Qué órdenes de trabajo están pendientes (en general o de un técnico)?<br>5. ¿Cuántas órdenes atendió cada técnico en un periodo? |
-| **Herramienta MCP por pregunta** | 1 → `buscar_repuesto` · 2 → `repuestos_por_reponer` · 3 → `historial_vehiculo` y `historial_cliente` · 4 → `ordenes_pendientes` · 5 → `resumen_ordenes_por_tecnico` |
+| **Preguntas que resuelve** | 0. ¿Qué hay de stock? (inventario completo)<br>1. ¿Cuánto stock queda de un repuesto y hay que reponerlo?<br>2. ¿Qué repuestos debo comprar o reponer?<br>3. ¿Qué trabajos se le hicieron a una placa? / ¿Qué órdenes tiene un DNI?<br>4. ¿Qué órdenes de trabajo están pendientes (en general o de un técnico)?<br>5. ¿Cuántas órdenes atendió cada técnico en un periodo? |
+| **Herramienta MCP por pregunta** | 0 → `listar_inventario` · 1 → `buscar_repuesto` · 2 → `repuestos_por_reponer` · 3 → `historial_vehiculo` y `historial_cliente` · 4 → `ordenes_pendientes` · 5 → `resumen_ordenes_por_tecnico` |
 | **Datos que necesita** | Tablas `repuestos`, `stock`, `vehiculos`, `clientes` y `ordenes_trabajo` de `data/taller.db` (20 registros simulados por tabla). |
 | **Lo que no hace** | No registra, modifica ni elimina órdenes, repuestos ni clientes (la base se abre en solo lectura). No muestra nombres ni DNI de clientes. No responde temas ajenos al taller (deportes, clima, recetas, política). No inventa cifras. |
 | **Tono** | Breve, amable y claro, en español, con fechas en formato día/mes/año y listas con guiones. Se presenta como asistente de inteligencia artificial al saludar. |
@@ -26,7 +26,7 @@ app/modules/asistente/router.py   ← hace de chat.php: puente, valida y guarda 
 agente/agente.py                  ← el agente: instrucciones + memoria + modelo que decide la herramienta
    │  stdio (MCP)
    ▼
-agente/servidor_mcp.py            ← 6 herramientas @mcp.tool(), solo SELECT, base en modo solo lectura
+agente/servidor_mcp.py            ← 7 herramientas @mcp.tool(), solo SELECT, base en modo solo lectura
    ▼
 data/taller.db (SQLite)
 ```

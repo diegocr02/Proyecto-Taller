@@ -2,7 +2,7 @@
 
 **Antes de empezar (5 minutos antes):**
 1. Abrir una terminal en la carpeta del proyecto y ejecutar `python -m uvicorn app.main:app --port 8000`.
-2. Esperar el mensaje `Servidor MCP listo con 6 herramientas`.
+2. Esperar el mensaje `Servidor MCP listo con 7 herramientas`.
 3. Abrir <http://localhost:8000>, elegir el rol **Gerente** y entrar a **Asistente IA**.
 4. Pulsar **Nueva conversación** para empezar con el chat limpio.
 5. Dejar la terminal visible en otra ventana: ahí se ve `Agente usa la herramienta MCP ...` en cada pregunta.
@@ -21,7 +21,7 @@
 | **¿Qué trabajos tiene la placa ABC-123?** | Debajo de la respuesta aparece «Herramienta MCP: `historial_vehiculo`». Mostrar también la línea en la terminal. |
 | **¿Cuántas baterías quedan?** y luego **¿Y cuál es su stock mínimo?** | La segunda pregunta no nombra el repuesto: demuestra que recuerda la conversación. |
 
-> "El modelo no ve la base de datos: solo ve la lista de 6 herramientas y elige cuál usar. Las herramientas son de solo lectura y nunca devuelven nombres ni DNI."
+> "El modelo no ve la base de datos: solo ve la lista de 7 herramientas y elige cuál usar. Las herramientas son de solo lectura y nunca devuelven nombres ni DNI."
 
 ## 3. Pregunta fuera de alcance — 30 segundos (Integrante 4)
 

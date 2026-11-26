@@ -67,6 +67,35 @@ def buscar_repuesto(texto: str) -> dict:
 
 
 @mcp.tool()
+def listar_inventario(solo_disponibles: bool = False) -> dict:
+    """Lista TODOS los repuestos del inventario con su stock actual, unidad, stock minimo y estado
+    (agotado, en el minimo, bajo el minimo o disponible). Con solo_disponibles=True omite los agotados.
+    Usar cuando el usuario pregunte en general que hay en stock, que productos o repuestos tiene,
+    que hay disponible, el inventario completo o un resumen del almacen, sin nombrar un repuesto concreto."""
+    filas = consultar(
+        """SELECT r.codigo, r.nombre, s.cantidad AS cantidad_actual, r.unidad, r.stock_minimo
+           FROM repuestos r JOIN stock s ON s.id_repuesto = r.id
+           WHERE s.cantidad > 0 OR ? = 0
+           ORDER BY r.nombre LIMIT 50""",
+        (1 if solo_disponibles else 0,),
+    )
+    for fila in filas:
+        if fila["cantidad_actual"] == 0:
+            fila["estado"] = "agotado"
+        elif fila["cantidad_actual"] < fila["stock_minimo"]:
+            fila["estado"] = "bajo el minimo"
+        elif fila["cantidad_actual"] == fila["stock_minimo"]:
+            fila["estado"] = "en el minimo"
+        else:
+            fila["estado"] = "disponible"
+    return {
+        "total_repuestos": len(filas),
+        "indicacion": f"Son {len(filas)} repuestos; menciona los {len(filas)}.",
+        "repuestos": filas,
+    }
+
+
+@mcp.tool()
 def repuestos_por_reponer() -> dict:
     """Lista los repuestos cuyo stock actual es menor o igual a su stock minimo, del mas critico al menos critico.
     TODOS los repuestos de la lista requieren reposicion (tambien los que estan justo en el minimo).
@@ -137,7 +166,8 @@ def historial_cliente(dni: str) -> dict:
 def ordenes_pendientes(tecnico: str = "") -> dict:
     """Lista las ordenes de trabajo que no estan cerradas (estado 'abierta' o 'en proceso'),
     con placa, motivo, tecnico y fecha de ingreso. Se puede filtrar por nombre del tecnico.
-    Usar cuando el usuario pregunte que trabajos estan pendientes, en proceso o que tiene asignado un tecnico."""
+    Usar cuando el usuario pregunte que trabajos estan pendientes o en proceso, que tiene asignado un tecnico,
+    o que vehiculos/carros/autos estan en el taller ahora (los que tienen una orden sin cerrar)."""
     filas = consultar(
         """SELECT o.id AS ot, substr(o.fecha_hora, 1, 10) AS fecha, v.placa, v.marca, v.modelo,
                   o.motivo, o.tecnico, o.estado
