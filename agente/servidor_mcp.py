@@ -69,15 +69,26 @@ def buscar_repuesto(texto: str) -> dict:
 @mcp.tool()
 def repuestos_por_reponer() -> dict:
     """Lista los repuestos cuyo stock actual es menor o igual a su stock minimo, del mas critico al menos critico.
+    TODOS los repuestos de la lista requieren reposicion (tambien los que estan justo en el minimo).
     Usar cuando el usuario pregunte que comprar, que reponer, que esta por agotarse o que alertas de stock hay."""
     filas = consultar(
-        """SELECT r.codigo, r.nombre, s.cantidad, r.unidad, r.stock_minimo,
-                  (r.stock_minimo - s.cantidad) AS faltan_para_minimo
+        """SELECT r.codigo, r.nombre, s.cantidad AS cantidad_actual, r.unidad, r.stock_minimo
            FROM repuestos r JOIN stock s ON s.id_repuesto = r.id
            WHERE s.cantidad <= r.stock_minimo
            ORDER BY CAST(s.cantidad AS REAL) / r.stock_minimo, r.nombre LIMIT 20"""
     )
-    return {"total": len(filas), "repuestos": filas}
+    for fila in filas:
+        if fila["cantidad_actual"] == 0:
+            fila["estado"] = "agotado - reponer"
+        elif fila["cantidad_actual"] < fila["stock_minimo"]:
+            fila["estado"] = "bajo el minimo - reponer"
+        else:
+            fila["estado"] = "en el minimo - reponer"
+    return {
+        "total_a_reponer": len(filas),
+        "indicacion": f"Hay {len(filas)} repuestos por reponer; menciona los {len(filas)}.",
+        "repuestos": filas,
+    }
 
 
 @mcp.tool()

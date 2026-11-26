@@ -24,6 +24,7 @@ Los casos 5 y 6 son preguntas de seguimiento hechas en la misma conversación qu
 | N.° | Qué pasó | Causa (según la guía del paso 7) | Corrección | Resultado |
 |---|---|---|---|---|
 | 2 | Usó la herramienta correcta, pero listó solo 6 de los 8 repuestos: omitió REP-005 (4/4) y REP-012 (3/3), que están justo en su mínimo. | Faltaba una regla en las instrucciones: la regla 5 limitaba la respuesta a "máximo 6 líneas" y el modelo recortó la lista. | Se cambió la regla 5 de `agente/instrucciones.txt`: cuando la herramienta devuelve una lista, incluir todos sus elementos, también los que están justo en el mínimo. | Se repitieron los 10 casos: 10 de 10 correctos. |
+| 2 (tercera ejecución, desde una copia limpia de GitHub) | Volvió a omitir los 2 repuestos que están justo en el mínimo y dijo que "no requieren reposición inmediata". | La herramienta devolvía un campo `faltan_para_minimo` que valía 0 para esos repuestos y el modelo lo interpretó como "no hay que reponer". | Se corrigió la herramienta `repuestos_por_reponer`: ahora devuelve la cantidad actual, un `estado` explícito ("en el minimo - reponer", "bajo el minimo - reponer", "agotado - reponer") y el total a reponer. También se reforzó la regla 5. | 6 ejecuciones seguidas con 3 formas de preguntar listaron los 8 repuestos; se repitieron los 10 casos: 10 de 10 correctos. |
 
 ## Ajustes hechos antes de la tabla (durante el desarrollo)
 

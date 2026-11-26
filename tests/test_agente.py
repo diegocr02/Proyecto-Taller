@@ -43,7 +43,7 @@ def test_repuestos_por_reponer_coincide_con_la_base(base):
         }
     resultado = s.repuestos_por_reponer()
     assert {r["codigo"] for r in resultado["repuestos"]} == esperados
-    assert resultado["repuestos"][0]["cantidad"] == 0  # el mas critico primero (agotado)
+    assert resultado["repuestos"][0]["cantidad_actual"] == 0  # el mas critico primero (agotado)
 
 
 def test_historial_vehiculo_acepta_placa_sin_guion(base):
