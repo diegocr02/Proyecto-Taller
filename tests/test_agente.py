@@ -33,6 +33,16 @@ def test_buscar_repuesto_por_codigo_y_no_encontrado(base):
     assert s.buscar_repuesto("turbo") == {"busqueda": "turbo", "encontrados": 0, "repuestos": []}
 
 
+def test_listar_inventario_devuelve_todo_y_filtra_agotados(base):
+    with sqlite3.connect(base) as conexion:
+        total = conexion.execute("SELECT COUNT(*) FROM repuestos").fetchone()[0]
+        agotados = conexion.execute("SELECT COUNT(*) FROM stock WHERE cantidad = 0").fetchone()[0]
+    todo = s.listar_inventario()
+    assert todo["total_repuestos"] == total
+    assert {"agotado", "disponible"} <= {r["estado"] for r in todo["repuestos"]}
+    assert s.listar_inventario(solo_disponibles=True)["total_repuestos"] == total - agotados
+
+
 def test_repuestos_por_reponer_coincide_con_la_base(base):
     with sqlite3.connect(base) as conexion:
         esperados = {
@@ -84,7 +94,7 @@ def test_servidor_mcp_real_expone_al_menos_dos_herramientas(base):
     """Enciende el servidor MCP por stdio, como lo hace el agente, y ejecuta una herramienta."""
     conexion = ConexionMCP()
     nombres = {h.name for h in conexion.listar_herramientas(espera=30)}
-    assert {"buscar_repuesto", "repuestos_por_reponer", "historial_vehiculo"} <= nombres
+    assert {"listar_inventario", "buscar_repuesto", "repuestos_por_reponer", "historial_vehiculo"} <= nombres
     assert "REP-004" in conexion.ejecutar("buscar_repuesto", {"texto": "bujia"})
 
 
