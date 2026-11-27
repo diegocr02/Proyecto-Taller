@@ -135,14 +135,19 @@ def poblar_datos_simulados(ruta_db: str = RUTA_BASE_DATOS_POR_DEFECTO) -> None:
     cursor = conexion.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Clientes simulados (Ley N.° 29733)
-    clientes_simulados = [
-        (1, "Cliente Simulado Uno", "10000001"),
-        (2, "Cliente Simulado Dos", "10000002"),
-        (3, "Cliente Simulado Tres", "10000003"),
+    
+    nombres_simulados = [
+        "Carlos Quispe Huamán", "María Flores Rojas", "José Mamani Torres",
+        "Rosa Chávez Vargas", "Luis Ramírez Castillo", "Ana Gutiérrez Paredes",
+        "Jorge Mendoza Salazar", "Carmen Rojas Espinoza", "Miguel Torres Cárdenas",
+        "Lucía Vásquez Ríos", "Pedro Sánchez Aguilar", "Elena Castro Medina",
+        "Juan Herrera Ponce", "Patricia Díaz Soto", "Ricardo Silva Navarro",
+        "Gabriela Ortiz Campos", "Fernando Reyes Valdivia", "Sofía Morales Benites",
+        "Raúl Cruz Palomino", "Diana Romero Huerta",
     ]
-    # Clientes adicionales para que el agente tenga datos suficientes (15-20 por tabla)
-    clientes_simulados += [(i, f"Cliente Simulado {i:02d}", f"100000{i:02d}") for i in range(4, 21)]
+    clientes_simulados = [
+        (i, nombre, f"100000{i:02d}") for i, nombre in enumerate(nombres_simulados, start=1)
+    ]
     cursor.executemany(
         """
         INSERT OR IGNORE INTO clientes (id, nombre, dni)
