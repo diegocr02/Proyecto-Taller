@@ -867,7 +867,7 @@ Ejecución automática del 2026-11-27, después de corregir los defectos: `pytho
 | R5 | `test_comparacion.py`: propiedades 12 y 13, `sin_items`, `repuesto_inexistente_se_excluye`, `se_persiste`, `avisa_si_no_se_pudo_guardar`, `mcp_no_disponible` | — |
 | R6 | `test_reportes.py`: propiedades 14, 15 y 16, `mcp_no_disponible`, `fecha_mal_formada` | — |
 | R7 | `test_rendimiento.py::test_rendimiento_p95` | 7.2 y 7.3 (indicador y corte en el navegador): **NO VERIFICADO** con prueba automática |
-| R8 | — | 8.3 (arranque sin clave): **NO VERIFICADO** con prueba automática; 8.2: revisión de `data/seed.py` |
+| R8 | — | 8.3 (arranque sin clave): caso P12 ejecutado a mano el 27/11/2026 (correcto; no hay prueba automática); 8.2: revisión de `data/seed.py` |
 | R9 | `test_asistente.py`: propiedad 17, `degradado_cuando_el_modelo_falla`, `informa_y_registra_la_herramienta_usada` | — |
 | R10 | `test_agente.py` (16 pruebas, incluidas las de comodines, tiempo total y respuesta sin terminar); `test_asistente.py`: `recuerda_la_conversacion_de_la_misma_sesion`, `rechaza_rol_o_pregunta_invalidos`, `borrar_conversacion_rechaza_rol_invalido`, `sin_texto_ni_error_responde_degradado` | 10.3–10.5: casos 7 a 10 de `docs/casos_prueba.md` (25/11/2026) y casos A1–A10 (27/11/2026). 10.6, 10.8, 10.9 y 10.12: **pendientes de ejecutar** |
 | R11 | — | **Pendiente de ejecutar** (casos nuevos en `docs/casos_prueba.md`) |
