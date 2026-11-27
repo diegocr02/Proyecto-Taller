@@ -1,13 +1,4 @@
-# servidor_mcp.py - Herramientas de JorgeBot sobre la base de datos del taller (solo lectura)
-"""
-Servidor MCP del proyecto final (paso 3 del instructivo).
-Cada herramienta responde una pregunta de la ficha del agente consultando data/taller.db.
-- La base se abre en modo solo lectura (mode=ro): ninguna herramienta puede modificar datos.
-- Todas las consultas usan parametros (?) y LIMIT; nunca SELECT *.
-- No se devuelven nombres ni DNI de clientes (Ley N.° 29733).
-Se ejecuta solo (python agente/servidor_mcp.py) o lo enciende el agente por stdio.
-"""
-
+# Historia: H-09 (servidor MCP de JorgeBot: 7 herramientas de solo lectura)
 import os
 import sqlite3
 import unicodedata
@@ -40,6 +31,11 @@ def consultar(sql: str, parametros: tuple = ()) -> list[dict]:
         conexion.close()
 
 
+def _escapar_like(texto: str) -> str:
+    """Escapa los comodines de LIKE (% y _) para que el texto del usuario se busque literal (ESCAPE '!')."""
+    return texto.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+
 def _raiz(palabra: str) -> str:
     """'pastillas' -> 'pastilla', 'baterías' -> 'bateria': asi el plural tambien encuentra el repuesto."""
     palabra = _sin_tildes(palabra).strip()
@@ -53,8 +49,9 @@ def buscar_repuesto(texto: str) -> dict:
     Usar cuando el usuario pregunte si hay un repuesto, cuanto stock queda o si esta disponible."""
     palabras = [_raiz(p) for p in texto.replace(",", " ").split() if len(p) >= 3]
     palabras = [p for p in palabras if p not in {"de", "del", "para", "los", "las", "hay", "stock"}] or [_raiz(texto)]
-    condiciones = " AND ".join(["(sin_tildes(r.nombre) LIKE ? OR lower(r.codigo) LIKE ?)"] * len(palabras))
-    parametros = tuple(v for p in palabras for v in (f"%{p}%", f"%{p}%"))
+    # Solo se repite la estructura con "?"; los textos del usuario van siempre como parametros
+    condiciones = " AND ".join(["(sin_tildes(r.nombre) LIKE ? ESCAPE '!' OR lower(r.codigo) LIKE ? ESCAPE '!')"] * len(palabras))
+    parametros = tuple(v for p in palabras for v in (f"%{_escapar_like(p)}%", f"%{_escapar_like(p)}%"))
     filas = consultar(
         f"""SELECT r.codigo, r.nombre, s.cantidad, r.unidad, r.stock_minimo
             FROM repuestos r JOIN stock s ON s.id_repuesto = r.id
@@ -172,9 +169,9 @@ def ordenes_pendientes(tecnico: str = "") -> dict:
         """SELECT o.id AS ot, substr(o.fecha_hora, 1, 10) AS fecha, v.placa, v.marca, v.modelo,
                   o.motivo, o.tecnico, o.estado
            FROM ordenes_trabajo o JOIN vehiculos v ON v.id = o.id_vehiculo
-           WHERE o.estado <> 'cerrada' AND sin_tildes(o.tecnico) LIKE ?
+           WHERE o.estado <> 'cerrada' AND sin_tildes(o.tecnico) LIKE ? ESCAPE '!'
            ORDER BY o.fecha_hora LIMIT 20""",
-        (f"%{_sin_tildes(tecnico).strip()}%",),
+        (f"%{_escapar_like(_sin_tildes(tecnico).strip())}%",),
     )
     return {"total": len(filas), "ordenes": filas}
 

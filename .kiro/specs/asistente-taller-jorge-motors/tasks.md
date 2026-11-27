@@ -1,5 +1,7 @@
 # Implementation Plan: Asistente de Gestión de Taller y Repuestos — Jorge Motors
 
+**Versión:** 2.0 · **Fecha:** 2026-11-27. Las casillas se revisaron contra el código y contra la ejecución de `python -m pytest` del 2026-11-27 (83 aprobadas, después de corregir los defectos). [x] = existe y funciona; [ ] = pendiente real. Cada `_Requisitos: x.y_` remite a `requirements.md` v2.0.
+
 ## Overview
 
 Implementación incremental del sistema completo: primero la base de datos y la estructura del proyecto, luego los módulos de dominio uno a uno (OT, Historial, Inventario, Alertas, Comparación, Reportes), los componentes compartidos (McpReadClient, GeminiGateway), el módulo de Asistente IA y finalmente el frontend HTML + JS. Cada módulo se integra con la aplicación principal antes de pasar al siguiente. Las sub-tareas de prueba marcadas con `*` son opcionales para un MVP rápido.
@@ -15,13 +17,13 @@ Implementación incremental del sistema completo: primero la base de datos y la 
   - Consulta parametrizada en `RepositorioOT.obtener_ot_por_id` sobre las tablas existentes `ordenes_trabajo`, `clientes` y `vehiculos` (relacionadas por `id_cliente` e `id_vehiculo`); sin tablas nuevas
   - Prueba `tests/test_ordenes_detalle.py`: 200 con dato real y 404 con id inexistente
   - Verificación: `http://127.0.0.1:8000/ordenes/1` → 200 con «Mantenimiento preventivo 45k»; `http://127.0.0.1:8000/ordenes/no-existe-zz` → 404
-  - _Requisitos: 1.2, 1.3, 2.2_
+  - _Requisitos: 1.2, 1.3, 1.9, 2.2_
 
 - [x] 1. Configurar estructura del proyecto y base de datos — **ELIMINAR · ya realizada** (crear proyecto, `.env.example` y base de datos ya existen desde S5–S6)
   - Crear la estructura de carpetas definida en el diseño: `app/`, `app/modules/`, `app/shared/`, `frontend/static/`, `data/`, `tests/`
   - Crear `requirements.txt` con las dependencias fijadas: `fastapi`, `uvicorn[standard]`, `httpx`, `python-dotenv`, `google-genai`, `pytest`, `hypothesis`
   - Crear `.env.example` con `GEMINI_API_KEY=your_key_here` (sin valor real)
-  - Crear `data/seed.py`: script que genera `data/taller.db` con tablas `clientes`, `vehiculos`, `ordenes_trabajo`, `repuestos`, `stock` y `trazabilidad_ia`, pobladas con datos simulados (sin datos reales de personas — Requisito 8.2)
+  - Crear `data/seed.py`: script que genera `data/taller.db` con tablas `clientes`, `vehiculos`, `ordenes_trabajo`, `repuestos`, `stock`, `trazabilidad_ia` y `comparaciones_conteo`, pobladas con datos simulados (sin datos reales de personas — Requisito 8.2)
   - Crear `app/main.py` con la aplicación FastAPI base: arranque, montaje de archivos estáticos y verificación de `GEMINI_API_KEY` al inicio (Requisito 8.3)
   - _Requisitos: 1.2, 1.3, 8.1, 8.2, 8.3_
 
@@ -29,7 +31,7 @@ Implementación incremental del sistema completo: primero la base de datos y la 
   - [x] 2.1 Crear modelos Pydantic y RepositorioOT
     - Definir `app/modules/ordenes/schemas.py` con `OTCrear` (campos obligatorios con validaciones de rango: año 1900–año_actual, km 0–999999, DNI 8 dígitos, placa máx. 10 car.) y `OTRespuesta`
     - Implementar `app/modules/ordenes/repositorio.py` con `RepositorioOT.crear_ot(datos) → OT` usando INSERT en SQLite y retornando el id generado con fecha/hora automática
-    - _Requisitos: 1.2, 1.3, 1.4_
+    - _Requisitos: 1.2, 1.3, 1.4, 1.6_
 
   - [x]* 2.2 Escribir prueba de propiedad para unicidad de identificadores de OT
     - **Propiedad 1: Unicidad de identificadores de OT**
@@ -55,6 +57,10 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Registrar el router en `app/main.py`
     - _Requisitos: 1.1, 1.4, 1.5, 1.7_
 
+  - [x] 2.6 Reutilizar cliente y vehículo existentes al registrar una OT *(agregada en v2.0: ya implementada)*
+    - `RepositorioOT.crear_ot` busca el cliente por DNI y el vehículo por placa; si existen, los actualiza y, si no, los crea, todo en la misma transacción (`PRAGMA foreign_keys = ON`)
+    - _Requisitos: 1.8_
+
 - [x] 3. Punto de control — Verificar Módulo OT — **ELIMINAR · no es tarea de construcción** (punto de control sin historia; lo cubren las pruebas de cada rebanada)
   - Asegurar que todas las pruebas del módulo OT pasen. Consultar al usuario si surge alguna duda.
 
@@ -64,12 +70,12 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Exponer métodos: `buscar_historial(criterio, tipo)`, `consultar_stock(termino)`, `listar_alertas()`, `comparar_conteo(items)`, `generar_reporte(fecha_inicio, fecha_fin)`
     - Si el servidor MCP no responde, elevar `McpNoDisponibleError` (capturado en cada módulo para retornar 503)
     - Incluir stub configurable para pruebas (sin conectar al MCP real hasta la semana 4)
-    - _Requisitos: 2.4, 3.6, 4.6, 5.5, 6.6_
+    - _Requisitos: 2.4, 3.6, 4.5, 5.5, 6.6_
 
   - [x]* 4.2 Escribir pruebas unitarias para McpReadClient con mock
     - Verificar comportamiento cuando el MCP responde correctamente
     - Verificar que `McpNoDisponibleError` se eleva cuando el servidor no está disponible
-    - _Requisitos: 2.4, 3.6, 4.6, 5.5, 6.6_
+    - _Requisitos: 2.4, 3.6, 4.5, 5.5, 6.6_
 
 - [x] 5. Implementar Módulo Historial [H-02] — **MANTENER**
   - [x] 5.1 Crear router del Módulo Historial
@@ -138,9 +144,9 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Invocar `McpReadClient.listar_alertas()` y retornar la lista de repuestos con cantidad ≤ stock_mínimo
     - Incluir en cada alerta: nombre, código, cantidad actual, stock_mínimo (Requisito 4.2)
     - Si lista vacía → 200 con mensaje indicando que no hay alertas activas (Requisito 4.3)
-    - Manejar `McpNoDisponibleError` → 503 (Requisito 4.6)
+    - Manejar `McpNoDisponibleError` → 503 (Requisito 4.5)
     - Registrar el router en `app/main.py`
-    - _Requisitos: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+    - _Requisitos: 4.1, 4.2, 4.3, 4.5_
 
   - [x]* 7.2 Escribir prueba de propiedad para corrección del filtrado de alertas
     - **Propiedad 11: Corrección del filtrado de alertas de stock mínimo**
@@ -151,8 +157,8 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 - [x] 8. Implementar Módulo Comparación y RepositorioComparacion [H-05] — **MANTENER**
   - [x] 8.1 Crear modelos Pydantic y RepositorioComparacion
     - Definir `app/modules/comparacion/schemas.py` con `ItemConteo`, `SolicitudComparacion` y `ResultadoComparacion`
-    - Implementar `app/modules/comparacion/repositorio.py` con `RepositorioComparacion.guardar_comparacion(resultados)` usando INSERT en SQLite
-    - _Requisitos: 5.1, 5.2_
+    - Implementar `app/modules/comparacion/repositorio.py` con `RepositorioComparacion.guardar_comparacion(resultados)` usando INSERT en la tabla `comparaciones_conteo`
+    - _Requisitos: 5.1, 5.2, 5.7_
 
   - [x] 8.2 Crear router del Módulo Comparación
     - Implementar `app/modules/comparacion/router.py` con `POST /comparacion`
@@ -160,11 +166,11 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Invocar `McpReadClient.comparar_conteo()` para obtener cantidades del sistema
     - Calcular diferencia = conteo_físico − cantidad_sistema para cada repuesto
     - Marcar con indicador de descuadre si diferencia ≠ 0 (Requisito 5.3)
-    - Manejar repuesto no encontrado → excluir fila con mensaje (Requisito 5.6)
+    - Manejar código no encontrado → excluir la fila y listarlo en `no_encontrados` con mensaje (Requisito 5.6; solo por código)
     - Manejar `McpNoDisponibleError` → 503 (Requisito 5.5)
     - Persistir resultados con `RepositorioComparacion`
     - Registrar el router en `app/main.py`
-    - _Requisitos: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
+    - _Requisitos: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
   - [x]* 8.3 Escribir prueba de propiedad para corrección del cálculo de diferencias
     - **Propiedad 12: Corrección del cálculo de diferencias en comparación de conteo físico**
@@ -217,23 +223,23 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Leer `GEMINI_API_KEY` exclusivamente desde variable de entorno (nunca del código — Requisito 8.1)
     - Aplicar timeout < 30 s; retornar resultado tipado: `GeminiExito(respuesta: str)` o `GeminiError(mensaje: str)`
     - En caso de error o timeout, retornar `GeminiError` sin propagar excepción al llamador (degradación controlada — ADR-003)
-    - _Requisitos: 8.1, 8.3, 9.3_
+    - *Estado v2.0:* se hizo en la S7, pero dejó de usarse cuando lo reemplazó el agente de la tarea 15 (ADR-004). **Se eliminó el 2026-11-27**, junto con su prueba y `google-genai`; la degradación controlada (9.3) la cumple ahora el agente
+    - _Requisitos: 8.1, 9.3_
 
-  - [x]* 11.2 Escribir pruebas unitarias para GeminiGateway
+  - [x]* 11.2 Escribir pruebas unitarias para GeminiGateway *(eliminadas el 2026-11-27 junto con `GeminiGateway`)*
     - Verificar comportamiento en éxito (mock de respuesta Gemini)
     - Verificar que timeout retorna `GeminiError` sin propagar excepción
     - Verificar que error de API retorna `GeminiError`
-    - _Requisitos: 8.1, 8.3_
+    - _Requisitos: 8.1, 9.3_
 
   - [x] 11.3 Crear router del Módulo Asistente IA
     - Implementar `app/modules/asistente/router.py` con `POST /asistente`
-    - Recibir `{pregunta, rol}` donde rol ∈ {Recepcionista, Técnico, Encargado_Compras, Gerente}
-    - Invocar `McpReadClient` para obtener contexto de inventario/historial relevante
-    - Pasar contexto + pregunta a `GeminiGateway.generar_respuesta()`
-    - Registrar en `trazabilidad_ia`: id único, timestamp ISO 8601, rol, pregunta, contexto MCP, respuesta (Requisito 9.1, 9.2)
-    - Si `GeminiGateway` retorna `GeminiError`, responder 200 con `{asistencia: null, mensaje: "Asistencia de IA no disponible en este momento"}` y registrar el error en el log (Requisito 9.3)
+    - Recibir `{pregunta, rol, sesion?}` donde rol ∈ {Recepcionista, Técnico, Encargado_Compras, Gerente}; 422 si la pregunta está vacía, supera 500 caracteres o el rol no es válido
+    - *Corregido en v2.0 (ingeniería inversa):* el router **no** usa `McpReadClient` ni `GeminiGateway`, como decía la versión 1.0; llama a `AgenteTaller.responder()` (tarea 15)
+    - Registrar en `trazabilidad_ia`: UUID, timestamp ISO 8601, rol, pregunta, herramientas usadas con sus argumentos y respuesta (`RepositorioTrazabilidad`)
+    - Si el agente devuelve un error, responder 200 con `{asistencia: null, mensaje: "Asistencia de IA no disponible en este momento"}` y guardar el error
     - Registrar el router en `app/main.py`
-    - _Requisitos: 9.1, 9.2, 9.3_
+    - _Requisitos: 9.1, 9.2, 9.3, 10.11_
 
   - [x]* 11.4 Escribir prueba de propiedad para completitud y unicidad del log de trazabilidad IA
     - **Propiedad 17: Completitud y unicidad del log de trazabilidad de IA**
@@ -253,12 +259,12 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Implementar pantalla de Registro de OT: formulario con los 9 campos obligatorios y manejo de errores de validación con el campo indicado (Requisito 1.4, 1.5)
     - Implementar pantalla de Historial: campo de búsqueda por placa o DNI, lista de resultados, detalle de OT seleccionada con los 6 campos (Requisito 2.1, 2.2, 2.3)
     - Implementar pantalla de Inventario: campo de búsqueda, lista de resultados con 4 campos por repuesto (Requisito 3.1, 3.2)
-    - Implementar pantalla de Alertas: lista automática al cargar con nombre, código, cantidad actual y stock_mínimo (Requisito 4.1, 4.2)
+    - Implementar pantalla de Alertas: lista automática al cargar con nombre, código, cantidad actual y stock_mínimo (Requisito 4.1, 4.2); contador en la pestaña y en la campana (Requisito 4.4)
     - Implementar pantalla de Comparación: formulario de conteo físico y tabla de resultados con indicador de descuadre (Requisito 5.1, 5.2, 5.3)
     - Implementar pantalla de Reportes: selector de fechas, tabla por técnico y botón de exportar CSV (Requisito 6.1, 6.5)
-    - Implementar pantalla de Asistente IA: campo de pregunta y área de respuesta con degradación visible (Requisito 9.1, 9.3)
+    - Implementar pantalla de Asistente IA: chat con burbujas, sugerencias, «Herramienta MCP: …», conversaciones recientes en `localStorage` (hasta 15), botón de nueva conversación y papelera (Requisitos 9.3, 10.8, 10.9, 10.12)
     - Servir `frontend/` como archivos estáticos desde `app/main.py`
-    - _Requisitos: 1.4, 1.5, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 5.1, 5.2, 5.3, 6.1, 6.5, 9.1, 9.3_
+    - _Requisitos: 1.4, 1.5, 1.7, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 4.4, 5.1, 5.2, 5.3, 6.1, 6.5, 9.3, 10.8, 10.9, 10.12_
 
 - [x] 14. Punto de control final — Verificar sistema integrado [H-07] — **MANTENER solo 14.1** (smoke test p95); el punto de control se elimina
   - Asegurar que todas las pruebas del sistema pasen (unitarias, PBT y de humo). Consultar al usuario si surge alguna duda.
@@ -266,7 +272,58 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Ejecutar 100 peticiones consecutivas contra `/historial` y `/inventario` con el Servidor MCP disponible y un usuario concurrente
     - Medir el p95; documentar el resultado en `docs/resultados_rendimiento.md`
     - Si el p95 supera 5 s, abrir una incidencia en el repositorio antes de cerrar la tarea
-    - _Requisito: R7.1_
+    - _Requisitos: 7.1_
+
+- [x] 15. Agente JorgeBot con herramientas MCP (proyecto final, Unidad 3) [H-09]. *Tarea agregada el 2026-11-27 por ingeniería inversa: ya estaba implementada pero no figuraba en el plan.* Reemplaza el flujo de la tarea 11.3 (contexto con `McpReadClient` + `GeminiGateway`)
+  - [x] 15.1 Servidor MCP de solo lectura con 7 herramientas
+    - `agente/servidor_mcp.py` (FastMCP): `buscar_repuesto`, `listar_inventario`, `repuestos_por_reponer`, `historial_vehiculo`, `historial_cliente`, `ordenes_pendientes` y `resumen_ordenes_por_tecnico`
+    - SQLite con `mode=ro`, parámetros `?`, `LIMIT` y sin nombres de clientes (Ley N.° 29733)
+    - _Requisitos: 10.1, 10.2, 10.3, 10.5_
+  - [x] 15.2 Agente con bucle de herramientas y varios proveedores
+    - `agente/agente.py` (`AgenteTaller`): enciende el Servidor MCP por stdio, llama al modelo (OpenAI, Gemini o Groq, con la API compatible con OpenAI), ejecuta hasta 4 rondas de herramientas y recuerda las últimas preguntas de cada sesión
+    - Instrucciones del agente en `agente/instrucciones.txt` (10 reglas: no inventar, fuera de alcance, privacidad, presentarse como IA, solo lectura, seguimiento)
+    - Límites: 20 s por llamada, 4 rondas, memoria de 10 mensajes y 200 sesiones (ADR-006); proveedor intercambiable (ADR-005)
+    - _Requisitos: 8.1, 9.3, 10.3, 10.4, 10.5, 10.6, 10.7, 10.10_
+  - [x] 15.3 Conectar el chat al agente y registrar la trazabilidad
+    - `POST /asistente` llama al agente y guarda en `trazabilidad_ia` las herramientas usadas; `DELETE /asistente/sesion/{sesion}` borra la memoria
+    - Pestaña «Asistente IA» del frontend con el chat de JorgeBot
+    - _Requisitos: 9.1, 9.2, 9.3, 10.8, 10.9, 10.11, 10.12_
+  - [x]* 15.4 Pruebas del agente
+    - `tests/test_agente.py`: las 7 herramientas sobre una base temporal, que sean de solo lectura, el servidor real por stdio y el ciclo del agente con un modelo falso
+    - Documentación: `docs/ficha_agente.md`, `docs/casos_prueba.md` y `docs/guion_demo.md`
+    - _Requisitos: 10.1, 10.2, 10.5, 10.7_
+
+- [x] 16. Interfaz por rol [H-01 a H-09] *(agregada en v2.0: ya implementada)*
+  - [x] 16.1 Selector de rol en la cabecera y pestañas por rol (`PANTALLAS_POR_ROL` en `frontend/static/app.js`)
+    - _Requisitos: 11.1, 11.2_
+  - [x] 16.2 Recordar el rol y la última pestaña en `localStorage`
+    - _Requisitos: 11.3_
+
+- [x] 17. Copia de revisión de la base en XAMPP [H-08] *(agregada en v2.0: ya implementada; ejecutada a mano el 2026-11-27)*
+  - [x] 17.1 `data/exportar_a_xampp.py`: lectura `mode=ro`, creación de `jorge_motors_app` (InnoDB, utf8mb4, claves foráneas) y mensaje de error si MySQL no está encendido (ADR-009)
+    - _Requisitos: 12.1, 12.2, 12.3_
+
+- [ ] 18. Pendientes reales detectados por ingeniería inversa *(agregada en v2.0)*
+  - [ ] 18.1 Permitir buscar por nombre en la comparación de conteo físico (hoy solo por código)
+    - _Requisitos: 5.6_
+  - [ ] 18.2 Mostrar en la interfaz un mensaje de servicio no disponible cuando falta la clave de IA (hoy el proceso termina antes de servir la página; ver «Requisitos retirados o pendientes»)
+    - _Requisitos: 8.3_
+  - [ ] 18.3 Guardar en `contexto_mcp` también los datos que devolvieron las herramientas (pendiente de la v1.0)
+    - _Requisitos: 9.1_
+  - [ ] 18.4 Prueba automática «crear una OT y buscarla por placa de inmediato» (criterio de reversión 2 del ADR-002)
+    - _Requisitos: 1.1, 2.1_
+  - [ ]* 18.5 Pruebas automáticas que faltan: actualizar el cliente o vehículo existente, contador de alertas, arranque sin clave, borrar una conversación y pestañas por rol
+    - _Requisitos: 1.8, 4.4, 8.3, 10.8, 11.2_
+  - [x] 18.6 Corregir los defectos anotados en design.md («Riesgos conocidos») *(hecho el 2026-11-27, con pruebas)*
+    - Tiempo total de 25 s por pregunta, menor que el corte de 30 s del navegador
+    - Respuesta vacía en la 5.ª vuelta → modo degradado
+    - Pregunta de solo espacios → 422; rol inválido al borrar una conversación → 422
+    - Aviso si no se pudo guardar una comparación
+    - Comodines `%` y `_` escapados en las herramientas MCP
+    - Eliminados `GeminiGateway`, su prueba y `google-genai`
+    - _Requisitos: 5.7, 7.3, 9.3, 10.10, 10.11_
+  - [ ]* 18.7 Ejecutar los casos de prueba «pendiente de ejecutar» de `docs/casos_prueba.md` (P1 a P12)
+    - _Requisitos: 1.8, 4.4, 8.3, 10.1, 10.6, 10.8, 10.9, 10.11, 10.12, 11.2_
 
 ---
 
@@ -275,7 +332,8 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 - Las sub-tareas marcadas con `*` son opcionales y se pueden omitir para un MVP rápido.
 - Cada tarea referencia los requisitos específicos del documento `requirements.md` para trazabilidad.
 - Las pruebas de propiedades (Hypothesis) deben ejecutarse con mínimo 100 iteraciones; las que involucran MCP o Gemini usan mocks para mantener las pruebas rápidas y deterministas.
-- El servidor MCP real se conecta en la semana 4; hasta entonces `McpReadClient` usa un stub configurable.
+- `McpReadClient` sigue en modo stub (lee SQLite con `mode=ro` en el mismo proceso) para los módulos H2–H6. El Servidor MCP real del proyecto (`agente/servidor_mcp.py`) lo usa el agente JorgeBot por stdio (tarea 15).
+- `GeminiGateway` (tarea 11.1) se eliminó el 2026-11-27: no se usaba en ejecución.
 - Los checkpoints en las tareas 3, 9 y 14 garantizan validación incremental antes de avanzar al siguiente módulo.
 - El rol de usuario se selecciona en la UI sin autenticación (deuda técnica aceptada, documentada en ADR-002).
 
@@ -299,7 +357,10 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     { "id": 10, "tasks": ["11.2", "11.3"] },
     { "id": 11, "tasks": ["11.4", "12.1"] },
     { "id": 12, "tasks": ["13.1"] },
-    { "id": 13, "tasks": ["14"] }
+    { "id": 13, "tasks": ["14"] },
+    { "id": 14, "tasks": ["2.6", "15.1", "16.1", "16.2", "17.1"] },
+    { "id": 15, "tasks": ["15.2", "15.3", "15.4"] },
+    { "id": 16, "tasks": ["18.1", "18.2", "18.3", "18.4", "18.5", "18.6", "18.7"] }
   ]
 }
 ```
@@ -313,3 +374,5 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 |---|---|---|
 | 2026-09-25 | Auditoría Fase 1 — Verificación 6: checkpoints 3, 9 y 14 ausentes en el Task Dependency Graph | Grafo actualizado con olas 4, 9 y 13 para dichos checkpoints |
 | 2026-09-25 | Auditoría Fase 1 — Verificación 1: R7.1 (p95 ≤ 5 s) sin tarea observable | Sub-tarea 14.1 añadida: smoke test 100 peticiones, medición p95, documentación resultado |
+| 2026-11-27 | Ingeniería inversa: el agente JorgeBot (H-09) estaba implementado pero no tenía tarea en el plan, y la nota sobre el MCP de la semana 4 estaba desactualizada | Tarea 15 agregada como completada (15.1–15.4); notas actualizadas sobre `McpReadClient`, Servidor MCP y `GeminiGateway` |
+| 2026-11-27 | Versión 2.0: referencias que no coincidían con requirements.md v2.0 (4.6, «3, 4, 2, 6», «R7.1»), tareas implementadas sin registrar y pendientes reales sin tarea | Referencias corregidas; tareas 2.6, 16 y 17 agregadas como hechas; tarea 18 con los pendientes reales; 11.1 y 11.3 anotadas según el código; grafo con las olas 14 a 16 |

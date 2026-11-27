@@ -131,3 +131,49 @@ def test_agente_incluye_instrucciones_y_rol_en_el_mensaje_de_sistema():
     sistema = vistos[0][0]["content"]
     assert "Eres JorgeBot" in sistema and "inteligencia artificial" in sistema
     assert "Encargado Compras" in sistema
+
+
+# --- Defectos corregidos el 2026-11-27 (ingenieria inversa, design.md «Riesgos conocidos») ---
+
+def test_comodines_like_se_buscan_literales(base):
+    # Antes "%" encontraba todos los repuestos y todas las ordenes pendientes
+    assert s.buscar_repuesto("%")["encontrados"] == 0
+    assert s.buscar_repuesto("___")["encontrados"] == 0
+    assert s.ordenes_pendientes("%")["total"] == 0
+    assert s.ordenes_pendientes("")["total"] > 0  # sin filtro sigue listando todas
+
+
+def test_agente_que_no_termina_de_responder_devuelve_error():
+    # El modelo pide herramientas en todas las vueltas, incluso cuando ya no se le ofrecen
+    def modelo(mensajes, herramientas):
+        return {"content": None, "tool_calls": [{"id": "x", "function": {"name": "listar_inventario", "arguments": "{}"}}]}
+
+    agente = AgenteTaller(llamar_modelo=modelo, ejecutar_herramienta=lambda n, a: "{}", listar_herramientas=lambda: [])
+    resultado = agente.responder("s1", "Gerente", "¿Qué hay de stock?")
+    assert resultado.respuesta is None
+    assert resultado.error and "no termino de responder" in resultado.error
+
+
+def test_agente_respeta_el_tiempo_total_por_pregunta(monkeypatch):
+    import time
+    from agente import agente as modulo
+
+    monkeypatch.setattr(modulo, "TIEMPO_TOTAL_RESPUESTA", 0.5)
+    monkeypatch.setattr(modulo, "TIEMPO_MINIMO_LLAMADA", 0.2)
+
+    def modelo_lento(mensajes, herramientas):
+        time.sleep(0.2)
+        return {"content": None, "tool_calls": [{"id": "x", "function": {"name": "listar_inventario", "arguments": "{}"}}]}
+
+    agente = AgenteTaller(llamar_modelo=modelo_lento, ejecutar_herramienta=lambda n, a: "{}", listar_herramientas=lambda: [])
+    inicio = time.monotonic()
+    resultado = agente.responder("s1", "Gerente", "¿Qué hay de stock?")
+    assert resultado.error and "tiempo total" in resultado.error
+    assert time.monotonic() - inicio < 1.0  # no espera las 5 vueltas
+
+
+def test_tiempo_total_del_agente_es_menor_que_el_corte_del_navegador():
+    from agente import agente as modulo
+
+    corte_navegador = 30.0  # TIEMPO_LIMITE_MS en frontend/static/app.js (Requisito 7.3)
+    assert modulo.TIEMPO_TOTAL_RESPUESTA < corte_navegador

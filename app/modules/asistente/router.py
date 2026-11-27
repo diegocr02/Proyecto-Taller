@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from agente.agente import AgenteTaller, obtener_agente
 from app.modules.asistente.repositorio import RepositorioTrazabilidad, obtener_repositorio_trazabilidad
-from app.modules.asistente.schemas import ConsultaAsistente, RespuestaAsistente
+from app.modules.asistente.schemas import ConsultaAsistente, RespuestaAsistente, Rol
 
 router = APIRouter(prefix="/asistente", tags=["Asistente IA"])
 logger = logging.getLogger("asistente_taller")
@@ -34,9 +34,10 @@ def consultar_asistente(
         agente.olvidar(sesion)
     contexto = {"herramientas": resultado.herramientas_usadas}
 
-    if resultado.error is not None:
-        id_consulta = trazabilidad.registrar(consulta.rol, pregunta, contexto, error=resultado.error)
-        logger.error("Consulta IA %s sin respuesta: %s", id_consulta, resultado.error)
+    if resultado.error is not None or not resultado.respuesta:
+        error = resultado.error or "El agente no devolvio respuesta"
+        id_consulta = trazabilidad.registrar(consulta.rol, pregunta, contexto, error=error)
+        logger.error("Consulta IA %s sin respuesta: %s", id_consulta, error)
         return RespuestaAsistente(id_consulta=id_consulta, asistencia=None, mensaje=MENSAJE_IA_NO_DISPONIBLE)
 
     id_consulta = trazabilidad.registrar(consulta.rol, pregunta, contexto, respuesta=resultado.respuesta)
@@ -48,6 +49,6 @@ def consultar_asistente(
 
 
 @router.delete("/sesion/{sesion}", status_code=204)
-def borrar_conversacion(sesion: str, rol: str, agente: AgenteTaller = Depends(obtener_agente)) -> None:
+def borrar_conversacion(sesion: str, rol: Rol, agente: AgenteTaller = Depends(obtener_agente)) -> None:
     """Borra la memoria de una conversacion (boton de papelera del chat)."""
     agente.olvidar(f"{rol}:{sesion}")

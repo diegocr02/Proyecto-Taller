@@ -1,153 +1,238 @@
 # Requirements Document
 
+**Versión:** 2.0 · **Fecha:** 2026-11-27 · **Método:** ingeniería inversa. La fuente de verdad es el código (`app/`, `agente/`, `frontend/`, `data/seed.py`) y la base `data/taller.db`, no la versión anterior de este documento. La versión 1.0 está en el historial de git (commit `d0a0237^`), y la 1.1 de hoy, en `.kiro/_historial/kiro_2026-11-27/`.
+
+**Formato de los criterios (EARS en español):** «CUANDO <evento>, EL Sistema DEBERÁ…» · «SI <condición>, ENTONCES EL Sistema DEBERÁ…» · «EL Sistema DEBERÁ…» (requisito permanente).
+
+## Cambios respecto de la versión 1.0
+
+| Requisito | Cambio | Motivo (evidencia en el código) |
+|---|---|---|
+| Todos | Criterios reescritos en EARS en español; «Gemini_API» pasa a «Proveedor_IA» | El agente usa OpenAI, Gemini o Groq (`agente/agente.py`, `PROVEEDORES`) |
+| R1 | 1.3 agrega `observaciones` (opcional, ≤ 1000) y el estado inicial «abierta». 1.6 se reformula: solo se valida el formato del DNI. Nuevos 1.8 (actualizar el cliente o el vehículo existente) y 1.9 (detalle de OT) | `app/modules/ordenes/schemas.py`, `repositorio.py`; `GET /ordenes/{id_ot}` |
+| R2 | 2.1 aclara que el guion de la placa se ignora | `app/modules/historial/schemas.py` (`criterio.replace("-", "")`) |
+| R4 | Se unen los criterios repetidos 4.1, 4.4 y 4.5; nuevo 4.4 (contador de alertas); el antiguo 4.6 pasa a 4.5 | `frontend/static/app.js` (`actualizarContadorAlertas`) |
+| R5 | 5.6 solo por código; nuevo 5.7 (se guarda cada comparación) | `ItemConteo.codigo`; tabla `comparaciones_conteo` |
+| R6 | 6.5 precisa el formato del CSV | `app/modules/reportes/router.py` (`utf-8-sig`) |
+| R8 | 8.2 precisa cómo son los datos simulados; 8.3 se ajusta a lo que hace el código | `data/seed.py`; `app/main.py` (`sys.exit(1)`) |
+| R9 | 9.1 describe el contexto real que se guarda | `app/modules/asistente/router.py` (`contexto = {"herramientas": …}`) |
+| R10 | **Nuevo:** agente conversacional JorgeBot | `agente/agente.py`, `agente/servidor_mcp.py`, `agente/instrucciones.txt` |
+| R11 | **Nuevo:** interfaz por rol | `PANTALLAS_POR_ROL` en `frontend/static/app.js` |
+| R12 | **Nuevo:** copia de revisión de la base en XAMPP | `data/exportar_a_xampp.py` |
+| R5.7, R10.10, R10.11 | Ajustados el 2026-11-27 al corregir defectos: aviso si no se guarda la comparación, tiempo total de 25 s por pregunta y rechazo de preguntas de solo espacios | `app/modules/comparacion/router.py`, `agente/agente.py`, `app/modules/asistente/schemas.py` |
+| — | Se crea la sección «Requisitos retirados o pendientes» | Criterios de la v1.0 que el código no cumple |
+
 ## Introduction
 
-El **Asistente de Gestión de Taller y Repuestos para Jorge Motors** digitaliza el registro de Órdenes de Trabajo (OT) y el control de inventario de repuestos, reemplazando el cuaderno y el Excel actuales. El sistema elimina el doble registro en recepción, reduce los descuadres entre el inventario físico y el digital, y acelera el diagnóstico técnico al centralizar el historial de clientes y vehículos.
+El **Asistente de Gestión de Taller y Repuestos para Jorge Motors** digitaliza el registro de Órdenes de Trabajo (OT) y el control de inventario de repuestos, reemplazando el cuaderno y el Excel actuales. Además, ofrece el agente de IA **JorgeBot**, que responde preguntas en lenguaje natural consultando la base de datos.
 
-El sistema está compuesto por un backend FastAPI (Python 3.11+), un frontend HTML + JavaScript simple, una base de datos SQLite con datos simulados y la Gemini API para funcionalidades de asistencia. Consume un servidor MCP propio de solo lectura (conectado en la semana 4) para todas las consultas de inventario y de historial. Todos los datos son simulados; ningún dato personal real es almacenado ni expuesto (Ley N.° 29733).
+Componentes: un backend FastAPI (Python 3.11+; instalado 3.12.10), un frontend HTML + JavaScript, una base SQLite con datos simulados (`data/taller.db`) y el agente JorgeBot. El agente usa un Servidor_MCP propio de solo lectura con 7 herramientas y un Proveedor_IA. Todos los datos son simulados (Ley N.° 29733).
 
-**Fuera de alcance:** facturación electrónica e integración con SUNAT, módulo de pagos en línea, compras automáticas a proveedores y aplicación móvil para clientes.
+**Fuera de alcance:** facturación electrónica e integración con SUNAT, pagos en línea, compras automáticas a proveedores, aplicación móvil, autenticación de usuarios, modificación del stock y cambio de estado de las OT.
 
 ---
 
 ## Glossary
 
 - **Sistema**: La aplicación web Asistente de Gestión de Taller y Repuestos de Jorge Motors.
-- **OT / Orden de Trabajo**: Registro digital que documenta el ingreso de un vehículo al taller, el motivo de atención, el técnico asignado y el estado del servicio.
-- **Recepcionista**: Asesor de servicio responsable de registrar y gestionar las OT.
-- **Técnico**: Mecánico automotriz asignado a una OT (Luis Pachas, Luis Luna, Miguel Torres).
-- **Encargado_Compras**: Encargado de Compras/Abastecimiento (Génesis Hernández) responsable del inventario de repuestos.
-- **Gerente**: Gerente de Jorge Motors, responsable de la supervisión operativa y el desempeño del taller.
-- **Servidor_MCP**: Servidor MCP de solo lectura propio del proyecto, disponible desde la semana 4, que expone los datos de inventario e historial almacenados en SQLite.
-- **Stock_Mínimo**: Cantidad umbral configurada por repuesto; cuando el stock real cae por debajo de ese umbral se activa una alerta.
-- **Conteo_Físico**: Recuento manual de unidades de repuestos realizado por el Encargado_Compras e ingresado al Sistema para comparación.
-- **Gemini_API**: Servicio de IA de Google utilizado para asistencia contextual; su clave se gestiona exclusivamente mediante variable de entorno.
+- **OT / Orden de Trabajo**: Registro del ingreso de un vehículo: motivo, técnico asignado y estado (abierta, en proceso o cerrada).
+- **Recepcionista**: Asesor de servicio responsable de registrar las OT.
+- **Técnico**: Mecánico asignado a una OT (Luis Pachas, Luis Luna o Miguel Torres, según el selector de `frontend/index.html`).
+- **Encargado_Compras**: Encargado de Compras/Abastecimiento, responsable del inventario de repuestos.
+- **Gerente**: Gerente de Jorge Motors; tiene acceso a todas las pantallas.
+- **Servidor_MCP**: Servidor MCP de solo lectura del proyecto (`agente/servidor_mcp.py`, transporte stdio) con 7 herramientas. Lo enciende el agente.
+- **Servicio_de_lectura**: Acceso de solo lectura que usan los módulos H-02 a H-06 (`McpReadClient`, SQLite `mode=ro`). Cuando no está disponible, los módulos responden 503.
+- **Agente**: JorgeBot (`AgenteTaller`, `agente/agente.py`).
+- **Proveedor_IA**: Servicio de modelo de lenguaje que usa el Agente: OpenAI, Gemini o Groq. Se usa `AGENTE_PROVEEDOR` o, si no está definido, el primero con clave en el orden OpenAI → Gemini → Groq.
+- **Stock_Mínimo**: Cantidad umbral por repuesto; hay alerta cuando cantidad ≤ Stock_Mínimo.
+- **Conteo_Físico**: Recuento manual de unidades que ingresa el Encargado_Compras para compararlo con el sistema.
+- **Sesión_de_chat**: Conversación del chat, identificada por el campo `sesion`; el Agente recuerda sus últimos 10 mensajes.
 
 ---
 
 ## Requirements
 
-### Requisito 1 [H-01]: Registro de Orden de Trabajo Digital
+### Requisito 1 [H-01]: Registro y consulta de Orden de Trabajo
 
 **Historia de usuario:** Como recepcionista, quiero registrar la orden de trabajo de forma digital al recibir un vehículo, para eliminar el doble registro en cuaderno y Excel y reducir el tiempo de atención en recepción.
 
 #### Criterios de aceptación
 
-1. WHEN el Recepcionista completa todos los campos obligatorios definidos en el criterio 3 y envía el formulario, THE Sistema SHALL crear la OT digital y dejarla disponible para el Técnico asignado en un plazo máximo de 2 minutos desde el envío del formulario.
-2. THE Sistema SHALL asignar automáticamente un identificador único e irrepetible a cada OT en el momento de su creación.
-3. THE Sistema SHALL registrar en cada OT los siguientes campos obligatorios: nombre del cliente (máximo 100 caracteres), DNI del cliente (exactamente 8 dígitos numéricos), placa del vehículo (máximo 10 caracteres), marca (máximo 50 caracteres), modelo (máximo 50 caracteres), año del vehículo (entre 1900 y el año en curso inclusive), kilometraje (entre 0 y 999,999 km inclusive), motivo de ingreso (máximo 500 caracteres), Técnico asignado y fecha/hora de creación generada automáticamente por el Sistema.
-4. IF el Recepcionista omite algún campo obligatorio de la OT, THEN THE Sistema SHALL mostrar un mensaje de error indicando el campo faltante y no crear la OT hasta que todos los campos obligatorios estén completos.
-5. WHEN la OT es creada exitosamente, THE Sistema SHALL mostrar al Recepcionista la confirmación con el identificador de la OT generada.
-6. THE Sistema SHALL permitir registrar únicamente datos de prueba que no correspondan a personas naturales identificables; ningún valor ingresado en los campos de nombre o DNI podrá coincidir con datos reales de personas, en cumplimiento de la Ley N.° 29733.
-7. IF el Sistema no puede crear la OT dentro del plazo de 2 minutos desde el envío del formulario, THEN THE Sistema SHALL mostrar al Recepcionista un mensaje de error indicando que la operación no pudo completarse y conservar los datos ingresados en el formulario para permitir un nuevo intento.
+1. CUANDO el Recepcionista complete los campos obligatorios del criterio 3 y envíe el formulario, EL Sistema DEBERÁ crear la OT y dejarla disponible para su consulta en un plazo máximo de 2 minutos.
+2. EL Sistema DEBERÁ asignar a cada OT, al crearla, un identificador numérico único e irrepetible.
+3. EL Sistema DEBERÁ registrar en cada OT: nombre del cliente (1–100 caracteres), DNI (exactamente 8 dígitos), placa (1–10 caracteres), marca (1–50), modelo (1–50), año (entre 1900 y el año en curso), kilometraje (0–999 999), motivo (1–500), técnico (1–100), observaciones (opcional, hasta 1000), estado inicial «abierta» y fecha y hora de creación en ISO 8601, generadas por el Sistema.
+4. SI falta un campo obligatorio o tiene un valor inválido, ENTONCES EL Sistema DEBERÁ responder 422 con un mensaje en español y la lista de campos con error, marcar esos campos en el formulario y no crear la OT.
+5. CUANDO la OT se cree, EL Sistema DEBERÁ mostrar la confirmación con el identificador de la OT.
+6. EL Sistema DEBERÁ rechazar un DNI que no tenga exactamente 8 dígitos numéricos.
+7. SI el Sistema no puede guardar la OT o no responde en 30 segundos, ENTONCES EL Sistema DEBERÁ mostrar un mensaje de error con la opción de reintentar y conservar los datos ingresados en el formulario.
+8. CUANDO se registre una OT con un DNI o una placa que ya existen, EL Sistema DEBERÁ actualizar los datos de ese cliente o vehículo en lugar de crear uno nuevo, dentro de la misma transacción que la OT.
+9. CUANDO se consulte `GET /ordenes/{id_ot}`, EL Sistema DEBERÁ devolver todos los datos de la OT con su cliente y su vehículo; SI la OT no existe o el identificador no es válido, ENTONCES EL Sistema DEBERÁ responder 404.
 
 ---
 
-### Requisito 2 [H-02]: Consulta de Historial de Cliente y Vehículo
+### Requisito 2 [H-02]: Consulta de historial de cliente y vehículo
 
 **Historia de usuario:** Como técnico mecánico, quiero consultar el historial del cliente y del vehículo, para diagnosticar más rápido sin depender del cuaderno físico.
 
 #### Criterios de aceptación
 
-1. WHEN el Técnico ingresa una placa (máximo 8 caracteres alfanuméricos) o un DNI (exactamente 8 dígitos numéricos) y ejecuta la búsqueda, THE Sistema SHALL devolver las hasta 100 OT más recientes asociadas a ese criterio en un plazo máximo de 5 segundos.
-2. WHEN el Técnico selecciona una OT del historial, THE Sistema SHALL mostrar exactamente los siguientes campos: identificador de OT, fecha, motivo de ingreso, Técnico asignado, estado y observaciones técnicas.
-3. IF no existen OT previas para la placa o el DNI ingresados, THEN THE Sistema SHALL mostrar un mensaje indicando que no se encontraron registros para ese criterio de búsqueda.
-4. IF el Servidor_MCP no está disponible al momento de la consulta, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el servicio de historial no está disponible en este momento.
-5. IF el Técnico envía el formulario de búsqueda con el campo vacío o con un formato que no corresponda a placa (máximo 8 caracteres alfanuméricos) ni a DNI (exactamente 8 dígitos numéricos), THEN THE Sistema SHALL mostrar un mensaje de error indicando el formato requerido y no ejecutar la búsqueda.
+1. CUANDO el usuario ingrese una placa (hasta 8 caracteres alfanuméricos, sin contar el guion) o un DNI (8 dígitos) y ejecute la búsqueda, EL Sistema DEBERÁ devolver, en un plazo máximo de 5 segundos, hasta las 100 OT más recientes asociadas, de la más reciente a la más antigua.
+2. CUANDO el usuario seleccione una OT del historial, EL Sistema DEBERÁ mostrar: identificador, fecha, motivo, técnico, estado y observaciones.
+3. SI no existen OT para la placa o el DNI ingresados, ENTONCES EL Sistema DEBERÁ mostrar «No se encontraron registros para ese criterio de búsqueda».
+4. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 con «El servicio de historial no está disponible en este momento».
+5. SI la búsqueda está vacía o no tiene formato de placa ni de DNI, ENTONCES EL Sistema DEBERÁ responder 422 con el formato requerido y no ejecutar la búsqueda.
 
 ---
 
-### Requisito 3 [H-03]: Consulta de Stock de Repuestos
+### Requisito 3 [H-03]: Consulta de stock de repuestos
 
 **Historia de usuario:** Como técnico mecánico, quiero consultar el stock de un repuesto antes de iniciar la reparación, para no detener el trabajo por falta de información sobre el inventario disponible.
 
 #### Criterios de aceptación
 
-1. WHEN el Técnico o el Encargado_Compras ingresa el nombre (máximo 100 caracteres) o el código (máximo 20 caracteres) de un repuesto y ejecuta la consulta, THE Sistema SHALL mostrar la cantidad actual en stock en un plazo máximo de 5 segundos.
-2. WHEN el Sistema devuelve el resultado de la consulta de stock, THE Sistema SHALL mostrar exactamente: nombre del repuesto, código, cantidad disponible y unidad de medida, y la consulta no modificará ningún dato del inventario.
-3. IF el código ingresado coincide exactamente con un repuesto del inventario, THE Sistema SHALL mostrar únicamente ese repuesto.
-4. IF la búsqueda por nombre devuelve más de un repuesto coincidente, THEN THE Sistema SHALL mostrar la lista de todos los repuestos coincidentes para que el usuario seleccione el deseado.
-5. IF el código o nombre del repuesto ingresado no existe en el inventario, THEN THE Sistema SHALL mostrar un mensaje indicando que el repuesto no fue encontrado.
-6. IF el Servidor_MCP no está disponible al momento de la consulta, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el servicio de inventario no está disponible en este momento.
-7. IF el usuario envía el formulario de búsqueda con el campo vacío o que contenga solo espacios en blanco, THEN THE Sistema SHALL mostrar un mensaje de error solicitando ingresar un nombre o código válido y no ejecutar la consulta.
+1. CUANDO el usuario ingrese el nombre o el código de un repuesto y ejecute la consulta, EL Sistema DEBERÁ mostrar la cantidad actual en stock en un plazo máximo de 5 segundos.
+2. EL Sistema DEBERÁ mostrar por cada repuesto: nombre, código, cantidad y unidad de medida, sin modificar ningún dato del inventario.
+3. SI el texto coincide exactamente con un código (sin distinguir mayúsculas), ENTONCES EL Sistema DEBERÁ mostrar únicamente ese repuesto.
+4. SI la búsqueda por nombre coincide con más de un repuesto, ENTONCES EL Sistema DEBERÁ mostrar todos los coincidentes.
+5. SI no existe ningún repuesto coincidente, ENTONCES EL Sistema DEBERÁ mostrar «Repuesto no encontrado».
+6. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 con «El servicio de inventario no está disponible en este momento».
+7. SI la búsqueda está vacía o solo tiene espacios, ENTONCES EL Sistema DEBERÁ responder 422 con «Ingrese un nombre o código de repuesto válido»; SI supera los 100 caracteres, ENTONCES DEBERÁ responder 422 con «El nombre o código no puede superar 100 caracteres». En ambos casos, no ejecutará la consulta.
 
 ---
 
-### Requisito 4 [H-04]: Alertas de Stock Mínimo
+### Requisito 4 [H-04]: Alertas de stock mínimo
 
 **Historia de usuario:** Como encargada de compras y abastecimiento, quiero recibir una alerta cuando un repuesto llegue a su stock mínimo, para generar el pedido al proveedor antes de que se agote el inventario.
 
 #### Criterios de aceptación
 
-1. WHEN el Encargado_Compras accede al panel del Sistema, THE Sistema SHALL consultar los niveles de stock a través del Servidor_MCP y generar las alertas correspondientes en un plazo máximo de 5 segundos, mostrando la lista consolidada de todos los repuestos cuya cantidad sea menor o igual al Stock_Mínimo configurado.
-2. WHEN el Sistema muestra una alerta de stock mínimo, THE Sistema SHALL incluir en cada alerta al menos: nombre del repuesto, código, cantidad actual y Stock_Mínimo configurado.
-3. IF ningún repuesto ha alcanzado su Stock_Mínimo al momento de la consulta, THEN THE Sistema SHALL mostrar un estado que indique que no hay alertas de stock activas.
-4. WHEN el Encargado_Compras accede al panel del Sistema, THE Sistema SHALL mostrar la lista consolidada de todos los repuestos cuya cantidad sea menor o igual al Stock_Mínimo configurado.
-5. IF la búsqueda de alertas detecta que la cantidad de un repuesto es menor o igual al Stock_Mínimo configurado, THEN THE Sistema SHALL incluir ese repuesto en la lista de alertas visible para el Encargado_Compras.
-6. IF el Servidor_MCP no está disponible cuando el Encargado_Compras accede al panel, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el servicio de inventario no está disponible y no mostrará alertas hasta que el servicio se restaure.
+1. CUANDO el usuario abra la pantalla de alertas o pulse «Actualizar», EL Sistema DEBERÁ mostrar, en un plazo máximo de 5 segundos, todos los repuestos cuya cantidad sea menor o igual a su Stock_Mínimo.
+2. EL Sistema DEBERÁ incluir en cada alerta: nombre, código, cantidad actual y Stock_Mínimo.
+3. SI ningún repuesto está en su Stock_Mínimo o por debajo, ENTONCES EL Sistema DEBERÁ mostrar «No hay alertas de stock activas».
+4. CUANDO se cargue la página, EL Sistema DEBERÁ mostrar el número de alertas en la pestaña «Alertas» y un indicador en la campana de la cabecera, a los roles que tienen acceso a las alertas.
+5. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 con un mensaje de servicio de inventario no disponible y no mostrar alertas.
 
 ---
 
-### Requisito 5 [H-05]: Comparación de Conteo Físico con Registro del Sistema
+### Requisito 5 [H-05]: Comparación del conteo físico con el sistema
 
 **Historia de usuario:** Como encargada de compras y abastecimiento, quiero comparar el conteo físico de repuestos con el registro del sistema, para detectar y documentar los descuadres entre el inventario real y el digital.
 
 #### Criterios de aceptación
 
-1. WHEN el Encargado_Compras ingresa las cantidades del Conteo_Físico para uno o más repuestos y solicita la comparación, THE Sistema SHALL consultar las cantidades registradas en el Servidor_MCP y calcular la diferencia (Conteo_Físico − cantidad registrada en el sistema) para cada repuesto ingresado en un plazo máximo de 5 segundos.
-2. WHEN el Sistema presenta los resultados de la comparación, THE Sistema SHALL mostrar, por cada repuesto comparado: nombre, código, cantidad registrada en el sistema, cantidad del Conteo_Físico y diferencia exacta expresada como valor entero con signo (positivo si hay excedente físico, negativo si hay faltante físico, cero si coinciden).
-3. IF la diferencia entre el Conteo_Físico y el registro del sistema es distinta de cero para algún repuesto, THEN THE Sistema SHALL marcar ese repuesto con un indicador de descuadre claramente distinguible del resto de filas en los resultados.
-4. IF el Encargado_Compras no ingresa ninguna cantidad de Conteo_Físico antes de solicitar la comparación, THEN THE Sistema SHALL mostrar un mensaje de error indicando que se debe ingresar al menos un repuesto con su conteo físico.
-5. IF el Servidor_MCP no está disponible cuando el Encargado_Compras solicita la comparación, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el servicio de inventario no está disponible y no ejecutará la comparación.
-6. IF el código o nombre de un repuesto ingresado en el Conteo_Físico no existe en el inventario del sistema, THEN THE Sistema SHALL mostrar un mensaje indicando que ese repuesto no fue encontrado y no incluirá esa fila en los resultados de la comparación.
+1. CUANDO el Encargado_Compras ingrese el Conteo_Físico de uno o más repuestos y solicite la comparación, EL Sistema DEBERÁ calcular la diferencia (Conteo_Físico − cantidad del sistema) de cada repuesto en un plazo máximo de 5 segundos.
+2. EL Sistema DEBERÁ mostrar por cada repuesto: nombre, código, cantidad del sistema, Conteo_Físico y diferencia como entero con signo.
+3. SI la diferencia de un repuesto es distinta de cero, ENTONCES EL Sistema DEBERÁ marcarlo con un indicador de descuadre.
+4. SI no se ingresa ningún repuesto, ENTONCES EL Sistema DEBERÁ responder 422 con «Debe ingresar al menos un repuesto con su conteo físico».
+5. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 y no ejecutar la comparación.
+6. SI un código ingresado no existe en el inventario, ENTONCES EL Sistema DEBERÁ excluirlo de los resultados y listarlo en `no_encontrados` con un aviso.
+7. CUANDO se calcule una comparación, EL Sistema DEBERÁ guardar cada fila en la tabla `comparaciones_conteo` con su fecha y hora; SI no puede guardarla, ENTONCES DEBERÁ mostrar el resultado con un aviso de que no quedó registrado.
 
 ---
 
-### Requisito 6 [H-06]: Reporte de Órdenes de Trabajo por Técnico
+### Requisito 6 [H-06]: Reporte de órdenes de trabajo por técnico
 
 **Historia de usuario:** Como gerente de Jorge Motors, quiero generar un reporte de órdenes de trabajo agrupado por técnico, para evaluar la carga de trabajo y el desempeño de cada mecánico en un período determinado.
 
 #### Criterios de aceptación
 
-1. WHEN el Gerente selecciona un rango de fechas (ambos extremos inclusivos) y solicita el reporte, THE Sistema SHALL consultar el Servidor_MCP y presentar, por cada Técnico, el número total de OT registradas en el período y la cantidad de OT por estado (abierta, en proceso, cerrada).
-2. THE Sistema SHALL incluir en el reporte únicamente las OT cuya fecha de creación sea igual o posterior a la fecha de inicio e igual o anterior a la fecha de fin del rango seleccionado por el Gerente.
-3. IF no existen OT en el rango de fechas seleccionado, THEN THE Sistema SHALL mostrar un mensaje indicando que no se encontraron órdenes de trabajo en el período indicado.
-4. IF la fecha de inicio del rango es posterior a la fecha de fin, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el rango de fechas es inválido y no generará el reporte hasta que el rango sea corregido.
-5. WHEN el reporte es generado exitosamente, THE Sistema SHALL permitir al Gerente exportar los resultados en formato CSV con las siguientes columnas mínimas: nombre del Técnico, total de OT en el período, cantidad de OT con estado "abierta", cantidad de OT con estado "en proceso" y cantidad de OT con estado "cerrada".
-6. IF el Servidor_MCP no está disponible cuando el Gerente solicita el reporte, THEN THE Sistema SHALL mostrar un mensaje de error indicando que el servicio de datos no está disponible y no generará el reporte.
+1. CUANDO el Gerente seleccione un rango de fechas (ambos extremos incluidos) y solicite el reporte, EL Sistema DEBERÁ mostrar por cada técnico el total de OT y la cantidad por estado (abierta, en proceso, cerrada).
+2. EL Sistema DEBERÁ incluir solo las OT cuya fecha de creación esté dentro del rango.
+3. SI no hay OT en el rango, ENTONCES EL Sistema DEBERÁ mostrar «No se encontraron órdenes de trabajo en el período indicado».
+4. SI la fecha de inicio es posterior a la de fin o una fecha no es válida, ENTONCES EL Sistema DEBERÁ responder 422 y no generar el reporte.
+5. CUANDO el reporte se genere, EL Sistema DEBERÁ permitir exportarlo a CSV en UTF-8 con BOM, separado por comas, con las columnas `Técnico, Total OT, Abiertas, En proceso, Cerradas`.
+6. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 con «El servicio de datos no está disponible en este momento».
 
 ---
 
-### Requisito 7 [H-07]: Rendimiento y Disponibilidad del Sistema
+### Requisito 7 [H-07]: Rendimiento y disponibilidad
 
-**Historia de usuario:** Como usuario del sistema (Recepcionista, Técnico, Encargado_Compras o Gerente), quiero que el sistema responda de forma oportuna, para no interrumpir el flujo de trabajo del taller.
+**Historia de usuario:** Como usuario del sistema, quiero que el sistema responda de forma oportuna, para no interrumpir el flujo de trabajo del taller.
 
 #### Criterios de aceptación
 
-1. THE Sistema SHALL responder al menos el 95 % de las consultas de historial y de stock en un tiempo igual o menor a 5 segundos, medido en una sesión con un único usuario concurrente y con el Servidor_MCP disponible.
-2. IF una operación tarda más de 2 segundos en devolver respuesta, THEN THE Sistema SHALL mostrar al usuario un indicador de carga visible (spinner o barra de progreso) mientras procesa la solicitud.
-3. IF una operación supera los 30 segundos sin devolver respuesta, THEN THE Sistema SHALL ocultar el indicador de carga, mostrar un mensaje de error indicando que la operación no pudo completarse y ofrecer al usuario la opción de volver a intentar la operación.
+1. EL Sistema DEBERÁ responder al menos el 95 % de las consultas de historial y de stock en 5 segundos o menos, con un único usuario concurrente.
+2. SI una petición tarda más de 2 segundos, ENTONCES EL Sistema DEBERÁ mostrar un indicador de carga.
+3. SI una petición supera los 30 segundos, ENTONCES EL Sistema DEBERÁ cancelarla, ocultar el indicador y mostrar un mensaje de error con la opción de reintentar.
 
 ---
 
-### Requisito 8 [H-08]: Seguridad de Credenciales y Privacidad de Datos
+### Requisito 8 [H-08]: Seguridad de credenciales y privacidad de datos
 
 **Historia de usuario:** Como administrador del proyecto, quiero que las credenciales de la API y los datos sensibles estén protegidos, para cumplir con la Ley N.° 29733 y con las buenas prácticas de seguridad del equipo.
 
 #### Criterios de aceptación
 
-1. THE Sistema SHALL almacenar la clave de la Gemini_API exclusivamente en una variable de entorno y nunca incluirla en el código fuente, en archivos de configuración ni en archivos .env versionados en Git.
-2. THE Sistema SHALL utilizar únicamente datos simulados durante el desarrollo y las pruebas; los datos simulados no deberán contener DNIs, nombres, direcciones ni números de teléfono reales de personas naturales identificables, en cumplimiento de la Ley N.° 29733.
-3. IF la variable de entorno que contiene la clave de la Gemini_API no está definida al iniciar el Sistema, THEN THE Sistema SHALL terminar el proceso con código de salida distinto de cero, registrar un error de configuración en el log y mostrar en la interfaz de usuario un mensaje genérico de servicio no disponible, sin mencionar la ausencia de la clave de API.
+1. EL Sistema DEBERÁ leer las claves del Proveedor_IA solo de variables de entorno (`.env`, que está en `.gitignore`), nunca del código ni de archivos versionados.
+2. EL Sistema DEBERÁ usar solo datos simulados: clientes con nombres inventados que no corresponden a personas reales y DNI de la serie `100000xx`.
+3. SI al arrancar no existe ninguna clave del Proveedor_IA (`OPENAI_API_KEY`, `GEMINI_API_KEY` ni `GROQ_API_KEY`) y no está activo `MODO_TEST=1`, ENTONCES EL Sistema DEBERÁ registrar un error de configuración en el log, sin mostrar la clave, y terminar el proceso con un código distinto de cero.
 
 ---
 
-### Requisito 9 [H-09]: Trazabilidad de Consultas con Asistencia IA
+### Requisito 9 [H-09]: Trazabilidad de las consultas al asistente
 
-**Historia de usuario:** Como administrador del proyecto, quiero que cada consulta asistida por la Gemini API quede registrada, para garantizar la trazabilidad de las respuestas generadas por IA en el sistema.
+**Historia de usuario:** Como administrador del proyecto, quiero que cada consulta asistida por IA quede registrada, para garantizar la trazabilidad de las respuestas generadas por IA en el sistema.
 
 #### Criterios de aceptación
 
-1. WHEN el Sistema procesa una consulta asistida por la Gemini_API, THE Sistema SHALL registrar en el log una entrada con identificador único, marca de tiempo en formato ISO 8601, el rol del usuario que realizó la consulta (Recepcionista, Técnico, Encargado_Compras o Gerente), la pregunta recibida, los datos recuperados del Servidor_MCP utilizados como contexto y la respuesta generada.
-2. THE Sistema SHALL registrar cada entrada de log de trazabilidad con un identificador único de entrada que permita recuperar la interacción completa.
-3. IF la Gemini_API devuelve un error en una consulta asistida, THEN THE Sistema SHALL registrar en el log la pregunta original, el error devuelto por la Gemini_API y la marca de tiempo en formato ISO 8601, e informar al usuario que la asistencia de IA no está disponible en ese momento, sin interrumpir las funcionalidades no dependientes de IA.
+1. CUANDO el Agente procese una consulta, EL Sistema DEBERÁ registrar en la tabla `trazabilidad_ia`: un identificador UUID v4, la marca de tiempo ISO 8601, el rol, la pregunta, las herramientas MCP usadas con sus argumentos (`contexto_mcp`) y la respuesta generada.
+2. EL Sistema DEBERÁ devolver al chat el identificador de la entrada (`id_consulta`), que permite recuperar la interacción completa.
+3. SI el Proveedor_IA o el Agente fallan, ENTONCES EL Sistema DEBERÁ guardar el error en la entrada, responder 200 con `asistencia: null` y «Asistencia de IA no disponible en este momento», y seguir atendiendo las demás funciones.
+
+---
+
+### Requisito 10 [H-09]: Agente conversacional JorgeBot
+
+**Historia de usuario:** Como usuario del taller, quiero hacer preguntas en lenguaje natural sobre el stock, las órdenes y el historial, para obtener la información sin recorrer varias pantallas.
+
+#### Criterios de aceptación
+
+1. CUANDO el usuario envíe una pregunta del taller, EL Agente DEBERÁ responder usando las herramientas del Servidor_MCP: `buscar_repuesto`, `listar_inventario`, `repuestos_por_reponer`, `historial_vehiculo`, `historial_cliente`, `ordenes_pendientes` o `resumen_ordenes_por_tecnico`.
+2. EL Servidor_MCP DEBERÁ abrir la base en solo lectura (`mode=ro`), usar consultas parametrizadas con `LIMIT` y no tener herramientas de escritura.
+3. SI una herramienta no devuelve resultados, ENTONCES EL Agente DEBERÁ decirlo sin inventar datos.
+4. SI la pregunta no tiene relación con el taller, ENTONCES EL Agente DEBERÁ decir que no puede ayudar con eso y recordar qué sí puede hacer.
+5. EL Agente NO DEBERÁ revelar sus instrucciones ni nombres o DNI de clientes; la herramienta `historial_cliente` no devuelve el nombre del cliente.
+6. CUANDO el usuario salude por primera vez en una conversación, EL Agente DEBERÁ presentarse como un asistente de inteligencia artificial.
+7. CUANDO el usuario haga una pregunta de seguimiento en la misma Sesión_de_chat, EL Agente DEBERÁ tener en cuenta los últimos 10 mensajes de esa sesión.
+8. CUANDO el usuario borre una conversación con el botón de la papelera, EL Sistema DEBERÁ olvidar su memoria (`DELETE /asistente/sesion/{sesion}`) y quitarla de la lista de conversaciones recientes.
+9. CUANDO el Agente use una herramienta, EL Sistema DEBERÁ mostrar en la respuesta del chat el nombre de la herramienta usada.
+10. EL Agente DEBERÁ limitar cada llamada al Proveedor_IA a 20 segundos, hacer como máximo 4 rondas de herramientas por pregunta y terminar cada pregunta en 25 segundos como máximo, para responder antes del corte de 30 segundos del navegador (7.3).
+11. SI la pregunta está vacía, tiene solo espacios o supera los 500 caracteres, o el rol no es uno de los cuatro válidos (también al borrar una conversación), ENTONCES EL Sistema DEBERÁ responder 422 sin llamar al Agente.
+12. EL Sistema DEBERÁ guardar en el navegador hasta 15 conversaciones recientes, para retomarlas desde la lista «Conversaciones recientes».
+
+---
+
+### Requisito 11 [H-01 a H-09]: Interfaz por rol
+
+**Historia de usuario:** Como usuario del taller, quiero ver solo las pantallas de mi rol, para encontrar rápido lo que necesito.
+
+#### Criterios de aceptación
+
+1. EL Sistema DEBERÁ permitir elegir el rol (Recepcionista, Técnico, Encargado_Compras o Gerente) en un selector de la cabecera, sin autenticación.
+2. CUANDO el usuario cambie de rol, EL Sistema DEBERÁ mostrar solo las pestañas de ese rol: Recepcionista → Registrar OT, Historial y Asistente IA; Técnico → Historial, Inventario y Asistente IA; Encargado_Compras → Inventario, Alertas, Comparación y Asistente IA; Gerente → todas.
+3. CUANDO el usuario vuelva a abrir la página, EL Sistema DEBERÁ recordar el último rol y la última pestaña (si el rol tiene acceso a ella).
+
+---
+
+### Requisito 12 [H-08]: Copia de revisión de la base en XAMPP
+
+**Historia de usuario:** Como integrante del equipo, quiero ver la base de datos en phpMyAdmin, para verificar los datos con una herramienta conocida.
+
+#### Criterios de aceptación
+
+1. CUANDO se ejecute `python data/exportar_a_xampp.py` con MySQL encendido, EL Sistema DEBERÁ crear de nuevo la base `jorge_motors_app` con las 7 tablas, sus claves foráneas y todos los datos de `data/taller.db`.
+2. EL script DEBERÁ abrir `data/taller.db` en solo lectura y no modificar ninguna otra base de MySQL.
+3. SI MySQL no está encendido o `mysql.exe` no existe, ENTONCES EL script DEBERÁ terminar con un mensaje de error en español.
+
+---
+
+## Requisitos retirados o pendientes
+
+| Criterio de la v1.0 | Estado | Motivo |
+|---|---|---|
+| 1.6 «ningún nombre o DNI ingresado podrá coincidir con datos reales» | **Retirado**; lo reemplazan 1.6 (formato del DNI) y 8.2 (datos simulados) | El software no puede saber si un nombre o DNI pertenece a una persona real; solo valida el formato |
+| 4.4 y 4.5 (repetían 4.1) | **Retirados** (unidos en 4.1) | Eran el mismo comportamiento |
+| 5.6 «buscar por código **o nombre**» | **Pendiente** (hoy solo por código) | `ItemConteo` solo tiene `codigo`; `McpReadClient.comparar_conteo` busca `UPPER(r.codigo) = UPPER(?)` |
+| 8.3 «mostrar en la interfaz un mensaje genérico de servicio no disponible» | **Pendiente** | El proceso termina antes de servir la página, así que el navegador solo muestra que no puede conectarse |
+| 9.1 «los datos recuperados del Servidor_MCP utilizados como contexto» | **Pendiente** (hoy se guardan las herramientas y sus argumentos, no los datos) | `contexto = {"herramientas": resultado.herramientas_usadas}` en `app/modules/asistente/router.py` |
+| Lecturas H-02 a H-06 «a través del Servidor_MCP» | **Pendiente** (hoy por `McpReadClient` en modo stub) | `usar_stub=True` por defecto; el Servidor_MCP lo usa solo el Agente (`docs/deuda_tecnica.md`) |
