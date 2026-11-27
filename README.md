@@ -39,6 +39,16 @@ Variables opcionales en `.env`: `OPENAI_MODEL` (por defecto `gpt-4o-mini`), `GEM
 
 Si no hay ninguna clave, el proceso termina al arrancar (Requisito 8.3). Si la clave existe pero la IA falla, solo el asistente responde "Asistencia de IA no disponible en este momento"; el resto del sistema sigue funcionando.
 
+### Ver la base de datos en XAMPP (phpMyAdmin)
+
+La app usa SQLite (`data/taller.db`), no MySQL, así que no necesita XAMPP. Para revisar los datos en phpMyAdmin se puede hacer una **copia de solo revisión**:
+
+```bash
+python data/exportar_a_xampp.py    # con MySQL encendido en el panel de XAMPP
+```
+
+Crea (o vuelve a crear) la base `jorge_motors_app` con las mismas 7 tablas y datos, y se ve en <http://localhost/phpmyadmin>. Lo que se cambie en phpMyAdmin no llega a la app; para actualizar la copia se vuelve a correr el script. Variables opcionales: `XAMPP_MYSQL` (ruta a `mysql.exe`, por defecto `C:\xampp\mysql\bin\mysql.exe`), `XAMPP_USUARIO`, `XAMPP_CLAVE` y `XAMPP_BD`.
+
 ### Probar el servidor MCP solo
 
 ```bash
