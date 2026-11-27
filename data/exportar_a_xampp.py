@@ -1,3 +1,4 @@
+# Historia: H-08 (solo datos simulados, Ley N.° 29733)
 """
 Copia data/taller.db (SQLite, la base que usa la app) a MySQL/MariaDB de XAMPP
 para poder revisarla en phpMyAdmin.
