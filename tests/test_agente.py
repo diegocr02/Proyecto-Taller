@@ -67,7 +67,7 @@ def test_historial_cliente_no_expone_nombre_ni_dni_ajenos(base):
     resultado = s.historial_cliente("10000002")
     assert resultado["encontrado"] is True
     assert "Ruido al frenar" in [o["motivo"] for o in resultado["ordenes"]]
-    assert "Cliente Simulado" not in json.dumps(resultado)
+    assert "María Flores Rojas" not in json.dumps(resultado, ensure_ascii=False)
     assert s.historial_cliente("123")["encontrado"] is False
 
 
