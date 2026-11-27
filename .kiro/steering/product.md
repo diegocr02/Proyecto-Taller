@@ -15,9 +15,10 @@ Digitalizar el registro de Órdenes de Trabajo y el control de inventario de rep
 - Consulta de stock de repuestos (solo lectura a través del Servidor MCP)
 - Generación de alertas de stock mínimo
 - Comparación de conteo físico con el registro del sistema
-- Generación de reporte de OT por técnico
+- Generación de reporte de OT por técnico (con exportación a CSV)
+- Asistente de IA (JorgeBot) que responde preguntas del taller consultando la base de datos con herramientas MCP de solo lectura, con trazabilidad de cada consulta
 
-> **PENDIENTE (equipo):** La versión original de este documento indicaba "consulta y **actualización** de stock". El resto del sistema (requirements.md, ADR-002) trata el stock como **solo lectura** a través del MCP. Si se requiere actualizar el stock desde esta aplicación, debe abrirse un nuevo requisito funcional y revisarse ADR-002.
+> **Resuelto (2026-11-27, ingeniería inversa):** la versión original de este documento decía «consulta y **actualización** de stock». El sistema construido trata el stock como **solo lectura**: ningún endpoint ni herramienta MCP lo modifica. Si en el futuro se necesita actualizar el stock, hay que abrir un nuevo requisito funcional y revisar el ADR-002.
 
 ## Lo que NO hace (FUERA)
 - Facturación electrónica integrada a SUNAT
@@ -38,3 +39,4 @@ Digitalizar el registro de Órdenes de Trabajo y el control de inventario de rep
 |---|---|---|
 | 2026-09-25 | Auditoría Fase 1: "Recepcionista" ausente en lista de usuarios pese a ser el actor principal en requirements.md | Recepcionista añadido con su descripción de rol |
 | 2026-09-25 | Auditoría Fase 1: "actualización de stock" en DENTRO contradice el modelo de solo lectura del MCP (requirements.md, ADR-002) | Reemplazado por "Consulta de stock" con nota PENDIENTE para que el equipo decida |
+| 2026-11-27 | Ingeniería inversa: el asistente de IA (H-09) no figuraba en DENTRO; el código confirma que el stock es de solo lectura | Asistente de IA y exportación CSV añadidos a DENTRO; nota PENDIENTE marcada como resuelta |

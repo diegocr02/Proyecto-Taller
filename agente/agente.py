@@ -1,3 +1,4 @@
+# Historia: H-09 (agente JorgeBot, proyecto final)
 # agente.py - JorgeBot: recibe un mensaje, deja que el modelo elija herramientas MCP y devuelve la respuesta
 """
 Agente del proyecto final (paso 4 del instructivo, ruta B en Python).

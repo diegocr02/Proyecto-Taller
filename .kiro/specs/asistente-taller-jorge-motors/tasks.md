@@ -268,6 +268,23 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Si el p95 supera 5 s, abrir una incidencia en el repositorio antes de cerrar la tarea
     - _Requisito: R7.1_
 
+- [x] 15. Agente JorgeBot con herramientas MCP (proyecto final, Unidad 3) [H-09]. *Tarea agregada el 2026-11-27 por ingeniería inversa: ya estaba implementada pero no figuraba en el plan.* Reemplaza el flujo de la tarea 11.3 (contexto con `McpReadClient` + `GeminiGateway`)
+  - [x] 15.1 Servidor MCP de solo lectura con 7 herramientas
+    - `agente/servidor_mcp.py` (FastMCP): `buscar_repuesto`, `listar_inventario`, `repuestos_por_reponer`, `historial_vehiculo`, `historial_cliente`, `ordenes_pendientes` y `resumen_ordenes_por_tecnico`
+    - SQLite con `mode=ro`, parámetros `?`, `LIMIT` y sin nombres de clientes (Ley N.° 29733)
+    - _Requisitos: 3, 4, 2, 6, 8.2_
+  - [x] 15.2 Agente con bucle de herramientas y varios proveedores
+    - `agente/agente.py` (`AgenteTaller`): enciende el Servidor MCP por stdio, llama al modelo (OpenAI, Gemini o Groq, con la API compatible con OpenAI), ejecuta hasta 4 rondas de herramientas y recuerda las últimas preguntas de cada sesión
+    - Instrucciones del agente en `agente/instrucciones.txt`
+    - _Requisitos: 8.1, 9.3_
+  - [x] 15.3 Conectar el chat al agente y registrar la trazabilidad
+    - `POST /asistente` llama al agente y guarda en `trazabilidad_ia` las herramientas usadas; `DELETE /asistente/sesion/{sesion}` borra la memoria
+    - Pestaña «Asistente IA» del frontend con el chat de JorgeBot
+    - _Requisitos: 9.1, 9.2, 9.3_
+  - [x]* 15.4 Pruebas del agente
+    - `tests/test_agente.py`: las 7 herramientas sobre una base temporal, que sean de solo lectura, el servidor real por stdio y el ciclo del agente con un modelo falso
+    - Documentación: `docs/ficha_agente.md`, `docs/casos_prueba.md` (10 casos) y `docs/guion_demo.md`
+
 ---
 
 ## Notes
@@ -275,7 +292,8 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 - Las sub-tareas marcadas con `*` son opcionales y se pueden omitir para un MVP rápido.
 - Cada tarea referencia los requisitos específicos del documento `requirements.md` para trazabilidad.
 - Las pruebas de propiedades (Hypothesis) deben ejecutarse con mínimo 100 iteraciones; las que involucran MCP o Gemini usan mocks para mantener las pruebas rápidas y deterministas.
-- El servidor MCP real se conecta en la semana 4; hasta entonces `McpReadClient` usa un stub configurable.
+- `McpReadClient` sigue en modo stub (lee SQLite con `mode=ro` en el mismo proceso) para los módulos H2–H6. El Servidor MCP real del proyecto (`agente/servidor_mcp.py`) lo usa el agente JorgeBot por stdio (tarea 15).
+- `GeminiGateway` (tarea 11.1) quedó como componente heredado: ya no se usa en ejecución y solo lo usa su prueba.
 - Los checkpoints en las tareas 3, 9 y 14 garantizan validación incremental antes de avanzar al siguiente módulo.
 - El rol de usuario se selecciona en la UI sin autenticación (deuda técnica aceptada, documentada en ADR-002).
 
@@ -313,3 +331,4 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 |---|---|---|
 | 2026-09-25 | Auditoría Fase 1 — Verificación 6: checkpoints 3, 9 y 14 ausentes en el Task Dependency Graph | Grafo actualizado con olas 4, 9 y 13 para dichos checkpoints |
 | 2026-09-25 | Auditoría Fase 1 — Verificación 1: R7.1 (p95 ≤ 5 s) sin tarea observable | Sub-tarea 14.1 añadida: smoke test 100 peticiones, medición p95, documentación resultado |
+| 2026-11-27 | Ingeniería inversa: el agente JorgeBot (H-09) estaba implementado pero no tenía tarea en el plan, y la nota sobre el MCP de la semana 4 estaba desactualizada | Tarea 15 agregada como completada (15.1–15.4); notas actualizadas sobre `McpReadClient`, Servidor MCP y `GeminiGateway` |

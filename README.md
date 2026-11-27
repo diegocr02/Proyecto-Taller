@@ -19,7 +19,7 @@ La documentación del proyecto está en `.kiro/steering/`, `.kiro/specs/asistent
 
 ## Puesta en marcha
 
-Requisitos: Python 3.10 o superior y una clave de IA. El agente usa la primera clave que encuentre en `.env`, en este orden: `OPENAI_API_KEY`, `GEMINI_API_KEY` (gratis en <https://aistudio.google.com/apikey>) o `GROQ_API_KEY` (contingencia). Las claves nunca se suben al repositorio (`.env` está en `.gitignore`).
+Requisitos: Python 3.11 o superior (probado con 3.12; ADR-001) y una clave de IA. El agente usa la primera clave que encuentre en `.env`, en este orden: `OPENAI_API_KEY`, `GEMINI_API_KEY` (gratis en <https://aistudio.google.com/apikey>) o `GROQ_API_KEY` (contingencia). Las claves nunca se suben al repositorio (`.env` está en `.gitignore`).
 
 ```bash
 git clone https://github.com/diegocr02/Proyecto-Taller.git

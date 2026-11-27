@@ -4,7 +4,14 @@
 
 ## Overview
 
-El sistema es una aplicación web de página única que digitaliza las Órdenes de Trabajo (OT) y el control de inventario de repuestos de Jorge Motors. Está compuesto por un backend FastAPI (Python 3.11+), un frontend HTML + JavaScript simple servido por el mismo proceso, y una base de datos SQLite local. Las lecturas de inventario e historial se canalizan a través de un servidor MCP propio de solo lectura (disponible desde la semana 4); las escrituras se realizan directamente sobre SQLite mediante repositorios internos. La integración con Gemini API se encapsula en un único `GeminiGateway` con degradación controlada: si Gemini falla, el sistema sigue operando con normalidad. Los datos son exclusivamente simulados, en cumplimiento de la Ley N.° 29733.
+El sistema es una aplicación web de página única que digitaliza las Órdenes de Trabajo (OT) y el control de inventario de repuestos de Jorge Motors. Está compuesto por un backend FastAPI (Python 3.11+), un frontend HTML + JavaScript simple servido por el mismo proceso, y una base de datos SQLite local (`data/taller.db`).
+
+Hay dos caminos de lectura, ambos de solo lectura (`mode=ro`):
+
+- **Módulos H-02 a H-06** (historial, inventario, alertas, comparación, reportes): leen mediante `McpReadClient` (`app/shared/mcp_client.py`), que consulta SQLite dentro del mismo proceso.
+- **Asistente IA (H-09, agente JorgeBot)**: el `AgenteTaller` (`agente/agente.py`) enciende como proceso hijo el Servidor MCP del proyecto (`agente/servidor_mcp.py`, FastMCP, transporte stdio) y usa sus 7 herramientas de solo lectura. El modelo de lenguaje se llama por HTTPS con la API compatible con OpenAI de uno de tres proveedores: OpenAI, Gemini o Groq (el primero con clave en `.env`, o el indicado en `AGENTE_PROVEEDOR`).
+
+Las escrituras (OT, conteo físico y trazabilidad de IA) se hacen directamente sobre SQLite mediante los repositorios de cada módulo. Si el proveedor de IA falla, solo el asistente responde "Asistencia de IA no disponible en este momento"; el resto del sistema sigue funcionando. Los datos son exclusivamente simulados, en cumplimiento de la Ley N.° 29733.
 
 ---
 
@@ -30,10 +37,8 @@ de Taller y Repuestos"]
     end
 
     subgraph Externos["Sistemas externos"]
-        MCP["Servidor MCP
-(semana 4 · solo lectura)"]
-        GEM["Gemini API
-(Google)"]
+        GEM["Proveedor de IA
+(OpenAI · Gemini · Groq)"]
     end
 
     REC -- "Registra OT" --> APP
@@ -43,11 +48,11 @@ y stock" --> APP
 y compara inventario" --> APP
     GER -- "Genera reportes
 por técnico" --> APP
-    APP -- "Lee inventario
-e historial" --> MCP
-    APP -- "Solicita asistencia
-con IA" --> GEM
+    APP -- "Pide respuestas al agente
+(HTTPS, API compatible con OpenAI)" --> GEM
 ```
+
+> El Servidor MCP no es un sistema externo: forma parte de la aplicación y lo enciende el propio agente (ver C4 Nivel 2).
 
 ### Diagrama C4 Nivel 2 — Contenedores
 ```mermaid
@@ -58,18 +63,18 @@ flowchart TD
 
     subgraph SistemaJorgeMotors["Sistema Jorge Motors"]
         F["FastAPI App\n(Python 3.11+)\npuerto 8000"]
-        DB["SQLite DB\narchivo taller.db"]
-        MCP["Servidor MCP\n(Python, solo lectura)\npuerto 8001"]
+        DB["SQLite DB\ndata/taller.db (modo WAL)"]
+        MCP["Servidor MCP\nagente/servidor_mcp.py\n(proceso hijo, stdio, solo lectura)"]
     end
 
     subgraph Externo["Servicios Externos"]
-        G["Gemini API\n(Google)"]
+        G["Proveedor de IA\n(OpenAI · Gemini · Groq)"]
     end
 
     B -- "HTTP / REST (JSON)" --> F
-    F -- "SQL directo (escritura)" --> DB
-    F -- "MCP protocol (lectura)" --> MCP
-    MCP -- "SQL (solo SELECT)" --> DB
+    F -- "SQL directo (escritura)\ny lectura mode=ro (McpReadClient)" --> DB
+    F -- "MCP por stdio\n(agente JorgeBot)" --> MCP
+    MCP -- "SQL (solo SELECT, mode=ro)" --> DB
     F -- "HTTPS / REST" --> G
 ```
 
@@ -95,39 +100,45 @@ flowchart TD
         end
 
         subgraph Shared["Compartido (shared/)"]
-            McpClient["McpReadClient\nmcp_client.py"]
-            GG["GeminiGateway\ngemini_gateway.py"]
+            McpClient["McpReadClient\nmcp_client.py\n(SQLite mode=ro)"]
+        end
+
+        subgraph Agente["Agente (agente/)"]
+            AG["AgenteTaller\nagente.py"]
         end
 
         subgraph Repos["Repositorios de escritura"]
             ROT["RepositorioOT\n(INSERT / UPDATE)"]
             RComp["RepositorioComparacion\n(INSERT)"]
+            RTraz["RepositorioTrazabilidad\n(INSERT)"]
         end
     end
 
     subgraph Datos["Capa de datos"]
         SQLite["SQLite DB\ntaller.db"]
-        MCP["Servidor MCP\n(solo lectura)"]
+        MCP["Servidor MCP\nservidor_mcp.py\n7 herramientas"]
     end
 
     subgraph Externo["Externo"]
-        Gemini["Gemini API"]
+        IA["Proveedor de IA\n(OpenAI · Gemini · Groq)"]
     end
 
     UI -- "HTTP" --> MOT & MHist & MInv & MAl & MComp & MRep & MAI
 
     MHist & MInv & MAl & MComp & MRep --> McpClient
-    MAI --> McpClient
-    MAI --> GG
+    MAI --> AG
+    MAI --> RTraz
 
     MOT --> ROT
     MComp --> RComp
 
     ROT --> SQLite
     RComp --> SQLite
-    McpClient --> MCP
+    RTraz --> SQLite
+    McpClient --> SQLite
+    AG -- "stdio" --> MCP
     MCP --> SQLite
-    GG --> Gemini
+    AG -- "HTTPS" --> IA
 ```
 
 ---
@@ -144,7 +155,7 @@ sequenceDiagram
     participant SQLite
 
     Recepcionista->>Navegador: Completa formulario y hace clic en "Registrar"
-    Navegador->>FastAPI: POST /ordenes {nombre, dni, placa, marca, modelo,<br/>año, km, motivo, tecnico}
+    Navegador->>FastAPI: POST /ordenes {nombre, dni, placa, marca, modelo,<br/>anio, kilometraje, motivo, tecnico, observaciones?}
     FastAPI->>FastAPI: Valida campos obligatorios y rangos
     alt Validación fallida
         FastAPI-->>Navegador: 422 Unprocessable Entity<br/>{campo faltante o inválido}
@@ -166,17 +177,17 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     subgraph Lab["Máquina del laboratorio (Windows / Linux)"]
-        subgraph ProcFastAPI["Proceso: python -m uvicorn app.main:app"]
+        subgraph ProcFastAPI["Proceso: python -m uvicorn app.main:app --port 8000"]
             FastAPI["FastAPI App\nPython 3.11+\npuerto 8000"]
         end
 
-        subgraph ProcMCP["Proceso: python mcp_server.py"]
-            MCP["Servidor MCP\nPython 3.11+\npuerto 8001\n(solo lectura)"]
+        subgraph ProcMCP["Proceso hijo (lo enciende el agente al arrancar)"]
+            MCP["Servidor MCP\nagente/servidor_mcp.py\nstdio, sin puerto\n(solo lectura)"]
         end
 
         DB["Archivo SQLite\ndata/taller.db\n(en disco local)"]
 
-        EnvFile[".env\n(GEMINI_API_KEY=...)"]
+        EnvFile[".env\n(OPENAI_API_KEY / GEMINI_API_KEY /\nGROQ_API_KEY, AGENTE_PROVEEDOR)"]
     end
 
     subgraph ClienteLab["Navegador del usuario (misma red)"]
@@ -184,18 +195,18 @@ flowchart TD
     end
 
     subgraph Cloud["Internet (externo)"]
-        Gemini["Gemini API\n(Google Cloud)"]
+        IA["Proveedor de IA\n(OpenAI · Gemini · Groq)"]
     end
 
     Browser -- "HTTP :8000" --> FastAPI
-    FastAPI -- "lee variable de entorno" --> EnvFile
-    FastAPI -- "SQL directo (escritura)" --> DB
-    FastAPI -- "MCP protocol :8001" --> MCP
+    FastAPI -- "lee variables de entorno" --> EnvFile
+    FastAPI -- "SQL directo" --> DB
+    FastAPI -- "stdin / stdout" --> MCP
     MCP -- "SQL SELECT" --> DB
-    FastAPI -- "HTTPS" --> Gemini
+    FastAPI -- "HTTPS" --> IA
 ```
 
-> **Nota de despliegue:** el proyecto usa Python 3.11+ con `uvicorn` como servidor ASGI. No se utiliza XAMPP, Apache ni MySQL. SQLite opera como archivo local sin servidor separado.
+> **Nota de despliegue:** el proyecto usa Python 3.11+ con `uvicorn` como servidor ASGI. Solo se abre **una** terminal: al arrancar, `app/main.py` enciende en segundo plano el Servidor MCP del agente (en el log aparece `Servidor MCP listo con 7 herramientas`). No se usa `--reload`, porque en Windows impide encender el Servidor MCP. La app no usa XAMPP, Apache ni MySQL; SQLite es un archivo local sin servidor. Para revisar los datos en phpMyAdmin existe una copia opcional de solo revisión: `python data/exportar_a_xampp.py` crea la base `jorge_motors_app` en MySQL/MariaDB de XAMPP. La app no lee esa copia.
 
 ---
 
@@ -209,92 +220,81 @@ flowchart TD
 | `Módulo Alertas` | Calcula y expone la lista de repuestos en alerta de stock mínimo | `app/modules/alertas/` | H4 |
 | `Módulo Comparación` | Recibe el conteo físico, consulta el stock registrado y devuelve diferencias con signo | `app/modules/comparacion/` | H5 |
 | `Módulo Reportes` | Genera el reporte de OT por técnico en un rango de fechas y produce el CSV | `app/modules/reportes/` | H6 |
-| `Módulo Asistente IA` | Orquesta la consulta de contexto al MCP y la llamada a Gemini para respuestas asistidas | `app/modules/asistente/` | H7 (Unidad 3) |
-| `McpReadClient` | Único punto de acceso al Servidor MCP de solo lectura; gestiona el protocolo y los errores de disponibilidad | `app/shared/mcp_client.py` | H2, H3, H4, H5, H6, H7 |
-| `GeminiGateway` | Único punto de acceso a Gemini API; lee la clave desde variable de entorno, aplica timeout < 30 s y retorna resultado tipado (éxito / "IA no disponible") | `app/shared/gemini_gateway.py` | H7 (Unidad 3) |
-| `RepositorioOT` | Ejecuta las escrituras (INSERT/UPDATE) de OT sobre SQLite | `app/modules/ordenes/` | H1 |
-| `RepositorioComparacion` | Persiste los resultados del conteo físico en SQLite | `app/modules/comparacion/` | H5 |
-| `Frontend HTML + JS` | Interfaz de usuario servida estáticamente; consume la API REST de FastAPI | `frontend/` | H1–H6 |
-| `taller.db` | Base de datos SQLite con datos simulados de clientes, vehículos, repuestos y stock | `data/taller.db` | Todos |
+| `Módulo Asistente IA` | Puente entre el chat y el agente: recibe `{pregunta, rol, sesion}`, llama a `AgenteTaller.responder()` y registra la trazabilidad; también borra la memoria de una conversación | `app/modules/asistente/` | H9 |
+| `AgenteTaller` (JorgeBot) | Agente con bucle de herramientas: envía la pregunta, las instrucciones (`agente/instrucciones.txt`) y las herramientas MCP al modelo; ejecuta las herramientas que pida y devuelve la respuesta. Recuerda las últimas preguntas por sesión. Límite de 20 s por llamada al modelo | `agente/agente.py` | H9 |
+| `Servidor MCP` | 7 herramientas de solo lectura (FastMCP, stdio): `buscar_repuesto`, `listar_inventario`, `repuestos_por_reponer`, `historial_vehiculo`, `historial_cliente`, `ordenes_pendientes` y `resumen_ordenes_por_tecnico`. Abre SQLite con `mode=ro`, usa parámetros `?` y `LIMIT`, y no devuelve nombres de clientes | `agente/servidor_mcp.py` | H9 |
+| `McpReadClient` | Acceso de solo lectura para los módulos H2–H6: consulta SQLite con `mode=ro` dentro del proceso (modo stub, activo por defecto) y lanza `McpNoDisponibleError` (→ 503) si la base no está disponible | `app/shared/mcp_client.py` | H2, H3, H4, H5, H6 |
+| `GeminiGateway` | **Componente heredado, sin uso en ejecución.** Era el acceso a Gemini antes del agente; hoy solo lo usa `tests/test_gemini_gateway.py`. El agente llama al modelo directamente | `app/shared/gemini_gateway.py` | — |
+| `RepositorioOT` | En una transacción: busca el cliente por DNI y el vehículo por placa, los actualiza si existen o los crea si no, e inserta la OT | `app/modules/ordenes/repositorio.py` | H1 |
+| `RepositorioComparacion` | Guarda cada resultado del conteo físico en `comparaciones_conteo` | `app/modules/comparacion/repositorio.py` | H5 |
+| `RepositorioTrazabilidad` | Guarda cada consulta al agente en `trazabilidad_ia` | `app/modules/asistente/repositorio.py` | H9 |
+| `Frontend HTML + JS` | Interfaz de usuario servida estáticamente, con selector de rol y chat de JorgeBot; consume la API REST de FastAPI | `frontend/` | H1–H9 |
+| `taller.db` | Base de datos SQLite con datos simulados (20 registros por tabla), creada por `data/seed.py` | `data/taller.db` | Todos |
 
-**Estructura de carpetas propuesta:**
+**Estructura de carpetas (real):** ver `.kiro/steering/structure.md`, que es la fuente de verdad.
 
 ```
-asistente_taller/
-  app/
-    main.py
-    modules/
-      ordenes/
-      historial/
-      inventario/
-      alertas/
-      comparacion/
-      reportes/
-      asistente/
-    shared/
-      mcp_client.py
-      gemini_gateway.py
-  frontend/
-    index.html
-    static/
-  data/
-    taller.db
-  tests/
-  docs/
-  .env.example
+app/            main.py, modules/<7 módulos>/, shared/mcp_client.py, shared/gemini_gateway.py
+agente/         agente.py, servidor_mcp.py, instrucciones.txt
+frontend/       index.html, static/app.js, static/styles.css, static/img/
+data/           seed.py, exportar_a_xampp.py, taller.db (no se versiona)
+tests/          12 archivos test_*.py + conftest.py
+docs/           ADR-001..003, ficha del agente, casos de prueba, guion de demo, etc.
 ```
 
 ---
 
 ### Contratos de la API REST
 
-> Los contratos completos (modelos Pydantic, validaciones de rango) se finalizan durante la implementación. Esta tabla establece los verbos HTTP, rutas, parámetros mínimos y códigos de respuesta acordados, derivados directamente de requirements.md.
+> Contratos obtenidos por ingeniería inversa de los routers y modelos Pydantic (`app/modules/*/router.py` y `schemas.py`) al 2026-11-27. Todo error de validación devuelve 422 con `{detail, campos}` (manejador en `app/main.py`).
 
 | Módulo | Verbo | Ruta | Parámetros / Cuerpo | Código éxito | Códigos de error | Requisitos |
 |---|---|---|---|---|---|---|
-| OT | POST | /ordenes | Body JSON: nombre, dni, placa, marca, modelo, anio, km, motivo, tecnico | 201 {id_ot, mensaje} | 422 campo inválido/faltante; 503 error interno | R1.1–R1.7 |
-| Historial | GET | /historial | Query: q=<placa\|dni> | 200 {ordenes: [...]} hasta 100 items | 422 formato inválido; 503 MCP no disponible | R2.1–R2.5 |
+| OT | POST | /ordenes | Body JSON: nombre (≤100), dni (8 dígitos), placa (≤10), marca (≤50), modelo (≤50), anio (1900–año en curso), kilometraje (0–999 999), motivo (≤500), tecnico (≤100), observaciones (opcional, ≤1000) | 201 {id_ot, mensaje: "OT creada exitosamente"} | 422 campo inválido/faltante; 503 error al guardar | R1.1–R1.7 |
+| OT (detalle) | GET | /ordenes/{id_ot} | Path: id_ot | 200 {id, nombre, dni, placa, marca, modelo, anio, kilometraje, motivo, tecnico, estado, observaciones, fecha_hora} | 404 no encontrada | R1.2 (Propiedad 2, round-trip) |
+| Historial | GET | /historial | Query: q=<placa\|dni> | 200 {ordenes: [{id, fecha, motivo, tecnico, estado, observaciones}], mensaje?}, hasta 100, de la más reciente a la más antigua | 422 formato inválido; 503 MCP no disponible | R2.1–R2.5 |
 | Historial (detalle) | GET | /historial/{id_ot} | Path: id_ot | 200 {id, fecha, motivo, tecnico, estado, observaciones} | 404 no encontrada; 503 MCP no disponible | R2.2 |
-| Inventario | GET | /inventario | Query: q=<nombre\|codigo> | 200 {resultados: [{nombre, codigo, cantidad, unidad}]} | 422 entrada vacía; 503 MCP no disponible | R3.1–R3.7 |
-| Alertas | GET | /alertas | — | 200 {alertas: [{nombre, codigo, cantidad, stock_minimo}]} o {alertas: [], mensaje} | 503 MCP no disponible | R4.1–R4.6 |
-| Comparación | POST | /comparacion | Body JSON: items: [{codigo, conteo_fisico}] (mín. 1 ítem) | 200 {resultados: [{nombre, codigo, sistema, conteo, diferencia, descuadre}]} | 422 sin ítems; 503 MCP no disponible | R5.1–R5.6 |
-| Reportes | GET | /reportes | Query: fecha_inicio=YYYY-MM-DD, fecha_fin=YYYY-MM-DD | 200 {reporte: [{tecnico, total, abierta, en_proceso, cerrada}]} | 422 rango inválido; 503 MCP no disponible | R6.1–R6.6 |
-| Reportes CSV | GET | /reportes/csv | Query: fecha_inicio, fecha_fin | 200 text/csv UTF-8, 5 columnas | 422 rango inválido; 503 MCP no disponible | R6.5 |
-| Asistente IA | POST | /asistente | Body JSON: {pregunta, rol} donde rol ∈ {Recepcionista, Técnico, Encargado_Compras, Gerente} | 200 {respuesta} o {asistencia: null, mensaje} (degradado) | 422 rol inválido | R9.1–R9.3 |
+| Inventario | GET | /inventario | Query: q=<nombre\|codigo> | 200 {resultados: [{nombre, codigo, cantidad, unidad}], mensaje?} | 422 entrada vacía; 503 MCP no disponible | R3.1–R3.7 |
+| Alertas | GET | /alertas | — | 200 {alertas: [{nombre, codigo, cantidad, stock_minimo}], mensaje?} (cantidad ≤ stock_minimo) | 503 MCP no disponible | R4.1–R4.6 |
+| Comparación | POST | /comparacion | Body JSON: items: [{codigo (≤20), conteo_fisico (≥0)}] (mín. 1 ítem) | 200 {resultados: [{nombre, codigo, sistema, conteo, diferencia, descuadre}], no_encontrados: [codigo], mensaje?} | 422 sin ítems; 503 MCP no disponible | R5.1–R5.6 |
+| Reportes | GET | /reportes | Query: fecha_inicio=YYYY-MM-DD, fecha_fin=YYYY-MM-DD | 200 {reporte: [{tecnico, total, abierta, en_proceso, cerrada}], mensaje?} | 422 rango inválido; 503 MCP no disponible | R6.1–R6.6 |
+| Reportes CSV | GET | /reportes/csv | Query: fecha_inicio, fecha_fin | 200 text/csv, UTF-8 con BOM (abre bien en Excel), separador coma, 5 columnas | 422 rango inválido; 503 MCP no disponible | R6.5 |
+| Asistente IA | POST | /asistente | Body JSON: {pregunta (1–500), rol ∈ {Recepcionista, Técnico, Encargado_Compras, Gerente}, sesion? (≤64, memoria de la conversación)} | 200 {id_consulta, asistencia, mensaje: null, herramientas: [nombres]} o, si la IA falla, {id_consulta, asistencia: null, mensaje: "Asistencia de IA no disponible en este momento", herramientas: []} | 422 rol o pregunta inválidos | R9.1–R9.3 |
+| Asistente IA (memoria) | DELETE | /asistente/sesion/{sesion} | Path: sesion; Query: rol | 204 (borra la memoria de esa conversación) | 422 rol faltante | R9 |
 
-> **PENDIENTE (equipo):** confirmar si se expone GET /ordenes/{id_ot} para recuperar una OT por ID (necesario para la Propiedad 2 de PBT, round-trip). No hay requisito funcional explícito para este endpoint; su ausencia no rompe la UI pero sí dificulta las pruebas automáticas.
+### Implementación del agente (Unidad 3, H-09)
 
-### Punto de extensión para la Unidad 3
+En la Unidad 3 el asistente se implementó como un **agente con herramientas MCP**. No usa `GeminiGateway` ni `McpReadClient`, como estaba previsto en la versión anterior de este documento:
 
-Cuando en la Unidad 3 se integre el agente de IA, los dos puntos de conexión naturales ya están definidos en la arquitectura actual:
+1. `POST /asistente` (`app/modules/asistente/router.py`) recibe la pregunta y llama a `AgenteTaller.responder(sesion, rol, pregunta)`.
+2. `AgenteTaller` (`agente/agente.py`) manda al modelo las instrucciones de `agente/instrucciones.txt`, la fecha de hoy, el rol, los últimos 10 mensajes de la sesión (memoria de hasta 200 conversaciones) y la lista de herramientas del Servidor MCP. Si la petición no trae `sesion`, la pregunta va sola y se olvida al terminar.
+3. Si el modelo pide una herramienta, el agente la ejecuta en `agente/servidor_mcp.py` (por stdio) y le devuelve el resultado. Puede hacerlo hasta 4 veces; en la última ya no ofrece herramientas y el modelo tiene que responder.
+4. El router guarda en `trazabilidad_ia` la pregunta, las herramientas que se usaron con sus argumentos (`contexto_mcp`, JSON `{"herramientas": [{nombre, argumentos}]}`) y la respuesta o el error. Además devuelve el `id_consulta` y los nombres de las herramientas usadas.
 
-- **`GeminiGateway`** (`app/shared/gemini_gateway.py`): es la única clase que se comunica con Gemini API. El agente de IA utilizará este mismo gateway para emitir sus prompts y recibir respuestas, sin necesidad de crear una nueva vía de comunicación con la API externa.
-
-- **`McpReadClient`** (`app/shared/mcp_client.py`): es el único componente que consulta el inventario e historial a través del Servidor MCP. El agente necesitará acceder a esos datos como contexto; lo hará a través de este cliente, sin modificar los módulos de dominio existentes.
-
-El `Módulo Asistente IA` (`app/modules/asistente/`) actúa como orquestador: recibirá la consulta del usuario, pedirá contexto a `McpReadClient` y delegará la generación de respuesta a `GeminiGateway`. El diseño detallado del agente, sus prompts, su lógica de orquestación y sus herramientas se definirán en la Unidad 3.
+El proveedor del modelo se elige así: `AGENTE_PROVEEDOR` si está definido; si no, la primera clave que exista en este orden: `OPENAI_API_KEY` (modelo por defecto `gpt-4o-mini`), `GEMINI_API_KEY` (`gemini-2.5-flash`), `GROQ_API_KEY` (`llama-3.3-70b-versatile`). Los tres se llaman con la misma API compatible con OpenAI por `httpx`. La ficha del agente está en `docs/ficha_agente.md` y los casos de prueba en `docs/casos_prueba.md`.
 
 ---
 
-### Decisiones no tomadas
+### Decisiones tomadas (antes «no tomadas»)
 
-Las siguientes decisiones quedan pendientes para el diseño detallado de cada módulo:
+Estas decisiones estaban pendientes en la versión de la Fase 1. El estado de cada una se obtuvo del código al 2026-11-27:
 
-- **Esquema de tablas SQLite**: nombres exactos de columnas, tipos de dato, restricciones de clave foránea e índices de las tablas `ordenes_trabajo`, `repuestos`, `stock`, `clientes`, `vehiculos` y `trazabilidad`.
-- **Contratos de la API REST**: rutas exactas, parámetros de consulta, cuerpos de solicitud y esquemas de respuesta (modelos Pydantic) para todos los endpoints.
-- **Formato exacto del CSV de exportación**: codificación de caracteres, delimitador, manejo de tildes y ñ, cabeceras en español.
-- **Manejo de concurrencia en SQLite**: ~~configuración del modo WAL~~ **Resuelto (2026-10-09):** `data/seed.py` activa el modo WAL (*Write-Ahead Logging*) y el stub de `McpReadClient` abre la base en solo lectura. Queda por probar con el Servidor MCP real (ADR-002, v1.1).
-- **Valor del timeout de GeminiGateway**: **Resuelto (2026-10-09):** se mantiene en 20 s tras medir 1–3 s con `gemini-3.5-flash-lite` (ADR-003, v1.1).
-- **Estrategia de paginación**: si la consulta de historial puede devolver más de 100 OT, cómo se trunca o pagina el resultado.
-- **Formato del log de trazabilidad**: estructura exacta de la tabla o archivo donde se almacenan las entradas de consultas asistidas por IA (Requisito 9).
-- **Valores del stock mínimo simulado**: rango de valores para el campo `stock_minimo` en los datos de prueba de `taller.db`.
-- **Rol de usuario en la interfaz**: cómo el usuario selecciona su rol (Recepcionista, Técnico, Encargado_Compras, Gerente) sin autenticación — deuda técnica aceptada en ADR-002.
+- **Esquema de tablas SQLite**: **Resuelto.** Son 7 tablas, definidas en `data/seed.py`; ver «Data Models».
+- **Contratos de la API REST**: **Resuelto.** Ver «Contratos de la API REST» (11 endpoints).
+- **Formato exacto del CSV de exportación**: **Resuelto.** UTF-8 con BOM, separador coma y cabeceras `Técnico, Total OT, Abiertas, En proceso, Cerradas`. El archivo se llama `reporte_ot_<inicio>_<fin>.csv`.
+- **Manejo de concurrencia en SQLite**: **Resuelto (2026-10-09).** `data/seed.py` activa el modo WAL, y tanto `McpReadClient` como el Servidor MCP abren la base en solo lectura (`mode=ro`). Sigue pendiente la prueba automática «crear una OT y buscarla por placa de inmediato» (criterio de reversión 2 del ADR-002).
+- **Timeout de la llamada al modelo**: **Resuelto.** Es de 20 s por llamada (`TIEMPO_LIMITE_MODELO` en `agente/agente.py`; ADR-003, v1.1).
+- **Estrategia de paginación**: **Resuelto.** No hay paginación: el historial devuelve como máximo las 100 OT más recientes (`LIMIT 100`), y las herramientas MCP usan `LIMIT` de 10 a 50 filas.
+- **Formato del log de trazabilidad**: **Resuelto.** Es la tabla `trazabilidad_ia`; ver «Data Models».
+- **Valores del stock mínimo simulado**: **Resuelto.** Van de 2 a 20 según el repuesto (`data/seed.py`).
+- **Rol de usuario en la interfaz**: **Resuelto.** Se elige en un selector (`<select id="rol">`) arriba a la derecha, sin autenticación. Es deuda técnica aceptada en ADR-002.
+- **Conexión con el Servidor MCP**: **Resuelto (H-09).** El Servidor MCP del proyecto (`agente/servidor_mcp.py`) lo usa solo el agente, por stdio y sin puerto. Los módulos H2–H6 siguen leyendo con `McpReadClient` en modo stub (SQLite `mode=ro`); el puerto 8001 de la versión anterior no se usa.
 
 ---
 
 ## Data Models
 
-> Las columnas marcadas **PENDIENTE** requieren decisión del equipo antes de implementar data/seed.py.
+> Este esquema se comprobó con ingeniería inversa contra `data/taller.db` y `data/seed.py` el 2026-11-27. Son 7 tablas; las columnas, los tipos y las restricciones coinciden exactamente. Datos simulados: 20 clientes con nombres inventados de apariencia real y DNI `100000xx`, 20 vehículos, 20 repuestos con su stock y 23 OT.
 
 ### Tabla: clientes
 
@@ -337,7 +337,7 @@ Las siguientes decisiones quedan pendientes para el diseño detallado de cada m�
 | codigo | TEXT | NOT NULL, UNIQUE | Máx. 20 caracteres (Requisito 3.1) |
 | nombre | TEXT | NOT NULL | Máx. 100 caracteres |
 | unidad | TEXT | NOT NULL | Ej.: unidad, litro, par |
-| stock_minimo | INTEGER | NOT NULL | Umbral de alerta (Requisito 4) — rango: **PENDIENTE** |
+| stock_minimo | INTEGER | NOT NULL | Umbral de alerta (Requisito 4): hay alerta si `cantidad ≤ stock_minimo`. En los datos simulados va de 2 a 20 |
 
 ### Tabla: stock
 
@@ -354,11 +354,26 @@ Las siguientes decisiones quedan pendientes para el diseño detallado de cada m�
 | timestamp | TEXT | NOT NULL | ISO 8601 (Requisito 9.1) |
 | rol | TEXT | NOT NULL | Recepcionista / Técnico / Encargado_Compras / Gerente |
 | pregunta | TEXT | NOT NULL | Texto libre |
-| contexto_mcp | TEXT | NOT NULL | JSON serializado de los datos del MCP usados como contexto |
-| respuesta | TEXT | | Texto generado por Gemini; NULL si hubo error |
-| error | TEXT | | Mensaje de error de Gemini; NULL si fue exitoso (Requisito 9.3) |
+| contexto_mcp | TEXT | NOT NULL | JSON con las herramientas MCP que usó el agente: `{"herramientas": [{"nombre", "argumentos"}]}` |
+| respuesta | TEXT | | Texto generado por el agente; NULL si hubo error |
+| error | TEXT | | Mensaje de error del proveedor de IA; NULL si fue exitoso (Requisito 9.3) |
 
-> **Nota sobre concurrencia:** ADR-002 identifica el riesgo de bloqueo entre las escrituras de FastAPI y las lecturas del MCP sobre el mismo archivo SQLite. Mitigación aplicada: modo WAL activado en `data/seed.py` y lecturas del stub MCP en solo lectura; falta verificarlo con el Servidor MCP real (ver "Decisiones no tomadas").
+### Tabla: comparaciones_conteo
+
+Guarda cada fila de una comparación de conteo físico (Requisito 5, H-05). La escribe `RepositorioComparacion`. Existe desde el proyecto base (`data/seed.py`), pero la versión anterior de este documento no la describía.
+
+| Columna | Tipo SQLite | Restricción | Notas |
+|---|---|---|---|
+| id | INTEGER | PK AUTOINCREMENT | |
+| fecha_hora | TEXT | NOT NULL | ISO 8601 de la comparación |
+| codigo | TEXT | NOT NULL | Código del repuesto comparado (sin FK: es una copia del momento) |
+| nombre | TEXT | NOT NULL | Nombre del repuesto en ese momento |
+| sistema | INTEGER | NOT NULL | Cantidad registrada en el sistema |
+| conteo | INTEGER | NOT NULL | Cantidad del conteo físico |
+| diferencia | INTEGER | NOT NULL | `conteo − sistema` (con signo) |
+| descuadre | INTEGER | NOT NULL | 1 si `diferencia ≠ 0`, 0 si coinciden |
+
+> **Nota sobre concurrencia:** ADR-002 identifica el riesgo de bloqueo entre las escrituras de FastAPI y las lecturas sobre el mismo archivo SQLite. Mitigación aplicada: modo WAL en `data/seed.py`, y `McpReadClient` y el Servidor MCP leen con `mode=ro`. No se han observado bloqueos al usar la app (por ejemplo, el chat lee mientras se registran OT), pero falta la prueba automática del criterio de reversión 2 (ver «Decisiones tomadas»).
 
 ## Correctness Properties
 
@@ -494,7 +509,7 @@ Las siguientes decisiones quedan pendientes para el diseño detallado de cada m�
 
 ### Property 17: Completitud y unicidad del log de trazabilidad de IA
 
-*Para cualquier* conjunto de N consultas asistidas por Gemini API procesadas por el sistema, cada entrada del log debe contener los seis campos requeridos (ID único, timestamp ISO 8601, rol del usuario, pregunta, contexto MCP utilizado y respuesta generada), y los N identificadores de entrada deben ser todos distintos entre sí.
+*Para cualquier* conjunto de N consultas asistidas por el agente de IA procesadas por el sistema, cada entrada del log debe contener los seis campos requeridos (ID único, timestamp ISO 8601, rol del usuario, pregunta, contexto MCP utilizado y respuesta generada), y los N identificadores de entrada deben ser todos distintos entre sí.
 
 **Validates: Requirements 9.1, 9.2**
 
@@ -504,15 +519,19 @@ Las siguientes decisiones quedan pendientes para el diseño detallado de cada m�
 
 | Situación | Código HTTP | Respuesta al cliente | Comportamiento interno |
 |---|---|---|---|
-| Campo obligatorio faltante o inválido en OT | 422 | `{detail: "campo X es requerido / inválido"}` | No se persiste nada; se devuelven los datos ingresados para reintento |
-| Servidor MCP no disponible | 503 | `{detail: "Servicio de inventario/historial no disponible en este momento"}` | Se registra el error en el log del proceso; no se expone la causa técnica |
-| Gemini API no disponible o timeout | 200 (degradado) | `{asistencia: null, mensaje: "Asistencia de IA no disponible en este momento"}` | GeminiGateway retorna resultado tipado de error; el módulo Asistente IA continúa operando con degradación |
-| Variable de entorno `GEMINI_API_KEY` ausente al arrancar | — | Mensaje genérico en la UI: "Servicio no disponible" | El proceso termina con código de salida distinto de cero y registra error de configuración en el log |
+| Campo obligatorio faltante o inválido (cualquier endpoint) | 422 | `{detail: "<mensaje legible>", campos: ["<campo>", ...]}` | No se guarda nada; el frontend marca los campos con error y conserva lo ingresado |
+| Error al guardar la OT | 503 | `{detail: "No se pudo registrar la orden de trabajo. Intente nuevamente."}` | Se revierte la transacción |
+| Lectura de datos no disponible (`McpNoDisponibleError`) | 503 | `{detail: "El servicio de historial no está disponible en este momento"}` (o «de inventario» / «de datos», según el módulo) | Se registra el error en el log del proceso; no se expone la causa técnica |
+| Proveedor de IA no disponible, timeout o error del agente | 200 (degradado) | `{id_consulta, asistencia: null, mensaje: "Asistencia de IA no disponible en este momento"}` | El error se guarda en `trazabilidad_ia.error`; el resto del sistema sigue funcionando |
+| Ninguna clave de IA (`OPENAI_API_KEY`, `GEMINI_API_KEY` ni `GROQ_API_KEY`) al arrancar | — | La app no arranca | El proceso termina con `sys.exit(1)` y registra «clave de API de asistencia no configurada» en el log. Con `MODO_TEST=1` (pruebas) no se exige clave |
 | Operación supera 2 segundos sin respuesta | — | Spinner/barra de progreso visible en el navegador | El frontend muestra el indicador de carga hasta recibir respuesta o hasta el timeout de 30 s |
 | Operación supera 30 segundos sin respuesta | — | Mensaje de error con opción de reintentar | El frontend oculta el spinner y ofrece al usuario la opción de reintento |
-| Búsqueda con entrada vacía o formato inválido | 422 | `{detail: "Formato inválido. Use placa (máx. 8 car. alfanuméricos) o DNI (8 dígitos)"}` | No se ejecuta ninguna consulta al MCP |
+| Búsqueda de historial vacía o con formato inválido | 422 | `{detail: "Formato inválido. Use placa (máx. 8 car. alfanuméricos) o DNI (8 dígitos)"}` | No se ejecuta ninguna consulta; el guion de la placa se ignora |
+| Búsqueda de inventario vacía | 422 | `{detail: "Ingrese un nombre o código de repuesto válido"}` | No se ejecuta ninguna consulta |
+| Comparación sin ítems | 422 | `{detail: "Debe ingresar al menos un repuesto con su conteo físico"}` | No se guarda nada |
 | Rango de fechas inválido (inicio > fin) | 422 | `{detail: "La fecha de inicio no puede ser posterior a la fecha de fin"}` | No se genera el reporte |
-| Repuesto no encontrado en el inventario | 200 | `{resultados: [], mensaje: "Repuesto no encontrado"}` | No se ejecuta ninguna escritura |
+| OT inexistente (`/ordenes/{id}` o `/historial/{id}`) | 404 | `{detail: "Orden de trabajo no encontrada"}` | — |
+| Sin resultados (consultas válidas) | 200 | Lista vacía + `mensaje`: «Repuesto no encontrado», «No se encontraron registros para ese criterio de búsqueda», «No hay alertas de stock activas» o «No se encontraron órdenes de trabajo en el período indicado» | No se ejecuta ninguna escritura |
 
 ---
 
@@ -526,8 +545,8 @@ La estrategia combina pruebas basadas en ejemplos (unitarias e integración) con
 
 Se usan para:
 - Verificar comportamientos específicos y condiciones de borde (listas vacías, repuesto inexistente, rango de fechas sin OT).
-- Validar el manejo de fallos de dependencias externas (MCP no disponible, Gemini con error) mediante mocks de `McpReadClient` y `GeminiGateway`.
-- Confirmar el comportamiento de arranque cuando `GEMINI_API_KEY` no está definida.
+- Validar el manejo de fallos de dependencias externas (lectura no disponible, proveedor de IA con error) con un `McpReadClient` que simula la caída y un agente falso.
+- Confirmar el comportamiento de arranque cuando no hay ninguna clave de IA definida. Hoy se comprueba a mano (prueba de humo): no hay una prueba automática.
 - Verificar la generación del indicador de carga en el frontend para operaciones lentas.
 
 Herramienta: `pytest` con `httpx` para pruebas de los endpoints FastAPI.
@@ -544,13 +563,16 @@ Cada prueba de propiedad debe incluir un comentario de etiqueta en el formato:
 # Feature: asistente-taller-jorge-motors, Propiedad N: <texto de la propiedad>
 ```
 
-Las propiedades que involucran consultas al MCP o llamadas a Gemini usan mocks para mantener las pruebas rápidas y deterministas. Las pruebas de integración end-to-end con el MCP real se reservan para la semana 4 cuando el servidor MCP esté disponible.
+Las propiedades que dependen del modelo de IA usan un modelo falso para que las pruebas sean rápidas y deterministas. El Servidor MCP real sí se prueba: `tests/test_agente.py` llama a sus 7 herramientas sobre una base temporal, comprueba que son de solo lectura y enciende el servidor por stdio para listar sus herramientas.
+
+**Estado al 2026-11-27:** `python -m pytest` da **81 pruebas aprobadas** en 12 archivos (`tests/test_*.py`). `tests/test_rendimiento.py` mide el p95 (ver `docs/resultados_rendimiento.md`).
 
 ### Pruebas de humo (*smoke tests*)
 
-- Verificar que el proceso arranca correctamente con la variable `GEMINI_API_KEY` definida.
-- Verificar que el proceso termina con código distinto de cero cuando `GEMINI_API_KEY` no está definida.
+- Verificar que el proceso arranca con al menos una clave de IA definida y que en el log aparece `Servidor MCP listo con 7 herramientas`.
+- Verificar que el proceso termina con código distinto de cero cuando no hay ninguna clave de IA.
 - Revisión documental de `data/taller.db` para confirmar que no contiene datos reales de personas.
+- Casos manuales del agente (incluidas preguntas trampa sobre datos inexistentes): `docs/casos_prueba.md`.
 
 ### Cobertura mínima esperada
 
@@ -562,8 +584,9 @@ Las propiedades que involucran consultas al MCP o llamadas a Gemini usan mocks p
 | `Módulo Alertas` | PBT (Propiedad 11) + ejemplo (lista vacía) |
 | `Módulo Comparación` | PBT (Propiedades 12, 13) + ejemplo (repuesto inexistente) |
 | `Módulo Reportes` | PBT (Propiedades 14, 15, 16) + integración con mock MCP |
-| `GeminiGateway` | Integración con mock (error, timeout, éxito) |
-| `Módulo Asistente IA` | PBT (Propiedad 17) + integración con mock Gemini |
+| `GeminiGateway` (heredado) | Integración con mock (error, timeout, éxito) |
+| `Módulo Asistente IA` | PBT (Propiedad 17) + integración con agente falso |
+| `Servidor MCP` y `AgenteTaller` | Ejemplos sobre base temporal (7 herramientas, solo lectura, sin nombres de clientes) + ciclo del agente con modelo falso |
 
 
 
@@ -579,3 +602,4 @@ Las propiedades que involucran consultas al MCP o llamadas a Gemini usan mocks p
 | 2026-09-25 | Auditoría Fase 1 — Verificación 2: Data Models vacío (solo texto placeholder) | Reemplazado con esquema de 6 tablas SQLite (columnas, tipos, restricciones, notas); valores PENDIENTE marcados explícitamente |
 | 2026-10-09 | Caracteres de control en las secciones de contratos de API y Data Models (acentos graves interpretados como escapes de PowerShell: `anio`, `tecnico`, `fecha`, `vehiculos`, `rol`, etc.) | Restauradas las letras perdidas; marcadas como resueltas las decisiones de modo WAL y timeout de Gemini |
 | 2026-09-25 | Auditoría Fase 1 — Verificación 2: interfaces sin verbos HTTP ni códigos de respuesta | Añadida tabla de Contratos de la API REST con verbo, ruta, parámetros, código de éxito, códigos de error y requisitos para los 9 endpoints |
+| 2026-11-27 | Ingeniería inversa del código y de `data/taller.db`: el documento describía el diseño de la Fase 1 (Gemini vía `GeminiGateway`, MCP en el puerto 8001) y no el sistema construido | Overview y diagramas C4 N1–N3 y de despliegue actualizados al agente JorgeBot (Servidor MCP por stdio, proveedores OpenAI/Gemini/Groq). Componentes: se agregan `AgenteTaller`, Servidor MCP y `RepositorioTrazabilidad`, y `GeminiGateway` se marca como heredado. Contratos de la API: 11 endpoints con los campos reales (`kilometraje`, `observaciones`, `no_encontrados`, `sesion`, `herramientas`, `GET /ordenes/{id_ot}`, `DELETE /asistente/sesion/{sesion}`). «Decisiones no tomadas» pasa a «Decisiones tomadas». Data Models: se agrega la tabla `comparaciones_conteo` y el rango 2–20 de `stock_minimo`. Errores y estrategia de pruebas: mensajes reales y 81 pruebas |

@@ -4,7 +4,7 @@
 
 El **Asistente de Gestión de Taller y Repuestos para Jorge Motors** digitaliza el registro de Órdenes de Trabajo (OT) y el control de inventario de repuestos, reemplazando el cuaderno y el Excel actuales. El sistema elimina el doble registro en recepción, reduce los descuadres entre el inventario físico y el digital, y acelera el diagnóstico técnico al centralizar el historial de clientes y vehículos.
 
-El sistema está compuesto por un backend FastAPI (Python 3.11+), un frontend HTML + JavaScript simple, una base de datos SQLite con datos simulados y la Gemini API para funcionalidades de asistencia. Consume un servidor MCP propio de solo lectura (conectado en la semana 4) para todas las consultas de inventario y de historial. Todos los datos son simulados; ningún dato personal real es almacenado ni expuesto (Ley N.° 29733).
+El sistema está compuesto por un backend FastAPI (Python 3.11+), un frontend HTML + JavaScript simple, una base de datos SQLite con datos simulados y un agente de IA (JorgeBot) que usa un Proveedor_IA para funcionalidades de asistencia. Las consultas de inventario e historial son de solo lectura: los módulos las hacen con `McpReadClient` y el agente, con las herramientas del Servidor_MCP del proyecto. Todos los datos son simulados; ningún dato personal real es almacenado ni expuesto (Ley N.° 29733).
 
 **Fuera de alcance:** facturación electrónica e integración con SUNAT, módulo de pagos en línea, compras automáticas a proveedores y aplicación móvil para clientes.
 
@@ -18,10 +18,10 @@ El sistema está compuesto por un backend FastAPI (Python 3.11+), un frontend HT
 - **Técnico**: Mecánico automotriz asignado a una OT (Luis Pachas, Luis Luna, Miguel Torres).
 - **Encargado_Compras**: Encargado de Compras/Abastecimiento (Génesis Hernández) responsable del inventario de repuestos.
 - **Gerente**: Gerente de Jorge Motors, responsable de la supervisión operativa y el desempeño del taller.
-- **Servidor_MCP**: Servidor MCP de solo lectura propio del proyecto, disponible desde la semana 4, que expone los datos de inventario e historial almacenados en SQLite.
-- **Stock_Mínimo**: Cantidad umbral configurada por repuesto; cuando el stock real cae por debajo de ese umbral se activa una alerta.
+- **Servidor_MCP**: Servidor MCP de solo lectura propio del proyecto (`agente/servidor_mcp.py`). Expone 7 herramientas sobre los datos de inventario e historial de SQLite; lo enciende el agente por stdio.
+- **Stock_Mínimo**: Cantidad umbral configurada por repuesto; cuando el stock real llega a ese umbral o cae por debajo (cantidad ≤ Stock_Mínimo) se activa una alerta.
 - **Conteo_Físico**: Recuento manual de unidades de repuestos realizado por el Encargado_Compras e ingresado al Sistema para comparación.
-- **Gemini_API**: Servicio de IA de Google utilizado para asistencia contextual; su clave se gestiona exclusivamente mediante variable de entorno.
+- **Proveedor_IA**: Servicio de modelo de lenguaje que usa el agente: OpenAI, Gemini (Google) o Groq, el primero cuya clave esté definida (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`) o el indicado en `AGENTE_PROVEEDOR`. Su clave se gestiona exclusivamente mediante variable de entorno. En versiones anteriores de este documento se llamaba «Gemini_API».
 
 ---
 
@@ -136,18 +136,30 @@ El sistema está compuesto por un backend FastAPI (Python 3.11+), un frontend HT
 
 #### Criterios de aceptación
 
-1. THE Sistema SHALL almacenar la clave de la Gemini_API exclusivamente en una variable de entorno y nunca incluirla en el código fuente, en archivos de configuración ni en archivos .env versionados en Git.
+1. THE Sistema SHALL almacenar la clave del Proveedor_IA exclusivamente en una variable de entorno y nunca incluirla en el código fuente, en archivos de configuración ni en archivos .env versionados en Git.
 2. THE Sistema SHALL utilizar únicamente datos simulados durante el desarrollo y las pruebas; los datos simulados no deberán contener DNIs, nombres, direcciones ni números de teléfono reales de personas naturales identificables, en cumplimiento de la Ley N.° 29733.
-3. IF la variable de entorno que contiene la clave de la Gemini_API no está definida al iniciar el Sistema, THEN THE Sistema SHALL terminar el proceso con código de salida distinto de cero, registrar un error de configuración en el log y mostrar en la interfaz de usuario un mensaje genérico de servicio no disponible, sin mencionar la ausencia de la clave de API.
+3. IF la variable de entorno que contiene la clave del Proveedor_IA no está definida al iniciar el Sistema, THEN THE Sistema SHALL terminar el proceso con código de salida distinto de cero, registrar un error de configuración en el log y mostrar en la interfaz de usuario un mensaje genérico de servicio no disponible, sin mencionar la ausencia de la clave de API.
+
+> **Estado de implementación (2026-11-27):** se cumplen 8.1 y 8.2. Los clientes simulados tienen nombres inventados de apariencia real y DNI `100000xx`, que no corresponden a personas reales. En 8.3, el proceso termina con `sys.exit(1)` y registra el error en el log cuando no existe ninguna de las tres claves. Como el proceso termina, la interfaz no se llega a servir: el navegador muestra que no puede conectarse, en lugar de un mensaje de la app. La clave nunca se menciona al usuario.
 
 ---
 
 ### Requisito 9 [H-09]: Trazabilidad de Consultas con Asistencia IA
 
-**Historia de usuario:** Como administrador del proyecto, quiero que cada consulta asistida por la Gemini API quede registrada, para garantizar la trazabilidad de las respuestas generadas por IA en el sistema.
+**Historia de usuario:** Como administrador del proyecto, quiero que cada consulta asistida por IA quede registrada, para garantizar la trazabilidad de las respuestas generadas por IA en el sistema.
 
 #### Criterios de aceptación
 
-1. WHEN el Sistema procesa una consulta asistida por la Gemini_API, THE Sistema SHALL registrar en el log una entrada con identificador único, marca de tiempo en formato ISO 8601, el rol del usuario que realizó la consulta (Recepcionista, Técnico, Encargado_Compras o Gerente), la pregunta recibida, los datos recuperados del Servidor_MCP utilizados como contexto y la respuesta generada.
+1. WHEN el Sistema procesa una consulta asistida por el Proveedor_IA, THE Sistema SHALL registrar en el log una entrada con identificador único, marca de tiempo en formato ISO 8601, el rol del usuario que realizó la consulta (Recepcionista, Técnico, Encargado_Compras o Gerente), la pregunta recibida, los datos recuperados del Servidor_MCP utilizados como contexto y la respuesta generada.
 2. THE Sistema SHALL registrar cada entrada de log de trazabilidad con un identificador único de entrada que permita recuperar la interacción completa.
-3. IF la Gemini_API devuelve un error en una consulta asistida, THEN THE Sistema SHALL registrar en el log la pregunta original, el error devuelto por la Gemini_API y la marca de tiempo en formato ISO 8601, e informar al usuario que la asistencia de IA no está disponible en ese momento, sin interrumpir las funcionalidades no dependientes de IA.
+3. IF el Proveedor_IA devuelve un error en una consulta asistida, THEN THE Sistema SHALL registrar en el log la pregunta original, el error devuelto por el Proveedor_IA y la marca de tiempo en formato ISO 8601, e informar al usuario que la asistencia de IA no está disponible en ese momento, sin interrumpir las funcionalidades no dependientes de IA.
+
+> **Estado de implementación (2026-11-27):** el «log» es la tabla `trazabilidad_ia` (ver design.md, «Data Models»). Cumple 9.2 y 9.3. En 9.1, el contexto MCP (`contexto_mcp`) guarda **qué herramientas** usó el agente y **con qué argumentos**, pero no los datos que esas herramientas devolvieron. Esos datos se pueden reconstruir volviendo a ejecutar la herramienta, aunque el resultado puede cambiar si los datos cambiaron después. Si se exige guardar los datos devueltos, hay que ampliar `contexto_mcp` en `app/modules/asistente/router.py`.
+
+---
+
+## Historial de cambios
+
+| Fecha | Hallazgo que lo origina | Cambio realizado |
+|---|---|---|
+| 2026-11-27 | Ingeniería inversa del código: el asistente se implementó como agente con 3 proveedores posibles, no solo Gemini, y el Servidor_MCP es parte del proyecto (stdio) | El término «Gemini_API» pasa a «Proveedor_IA». Se actualizan la introducción y las definiciones de Servidor_MCP y Stock_Mínimo (≤, como en el código y la Propiedad 11). Se agregan notas de estado de implementación en R8 y R9 con las diferencias encontradas. Los criterios de aceptación no cambian, salvo el nombre del término |
