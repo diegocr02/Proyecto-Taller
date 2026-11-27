@@ -77,7 +77,7 @@ Agregados en la versión 2.0 de la documentación para funciones que hoy no tien
 | P9 | 11.2 | Cambiar el rol a Recepcionista, Técnico, Encargado de Compras y Gerente | Pestañas: 3, 3, 4 y 7, respectivamente | | Pendiente de ejecutar |
 | P10 | 4.4 | Abrir la página como Encargado de Compras | El contador de la pestaña «Alertas» muestra 8 y la campana muestra el punto | | Pendiente de ejecutar |
 | P11 | 1.8 | Registrar una OT con el DNI 10000001 y otro nombre | Se crea la OT y el cliente 1 queda con el nombre nuevo (no se crea otro cliente) | | Pendiente de ejecutar |
-| P12 | 8.3 | Renombrar temporalmente `.env` y arrancar la app | El proceso termina con código distinto de 0 y en el log aparece «clave de API de asistencia no configurada» | | Pendiente de ejecutar |
+| P12 | 8.3 | Renombrar temporalmente `.env` y arrancar la app | El proceso termina con código distinto de 0 y en el log aparece «clave de API de asistencia no configurada» | Ejecutado el 27/11/2026 en un clon limpio de `main` (sin `.env` y sin claves en el entorno): código de salida 3 y el mensaje esperado en el log, sin mostrar ninguna clave | **Correcto** |
 
 > P1 a P7 usan el proveedor de IA; P8 a P12 no gastan cuota.
 
