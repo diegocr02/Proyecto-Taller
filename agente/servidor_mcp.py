@@ -1,13 +1,4 @@
-# servidor_mcp.py - Herramientas de JorgeBot sobre la base de datos del taller (solo lectura)
-"""
-Servidor MCP del proyecto final (paso 3 del instructivo).
-Cada herramienta responde una pregunta de la ficha del agente consultando data/taller.db.
-- La base se abre en modo solo lectura (mode=ro): ninguna herramienta puede modificar datos.
-- Todas las consultas usan parametros (?) y LIMIT; nunca SELECT *.
-- No se devuelven nombres ni DNI de clientes (Ley N.° 29733).
-Se ejecuta solo (python agente/servidor_mcp.py) o lo enciende el agente por stdio.
-"""
-
+# Historia: H-09 (servidor MCP de JorgeBot: 7 herramientas de solo lectura)
 import os
 import sqlite3
 import unicodedata
