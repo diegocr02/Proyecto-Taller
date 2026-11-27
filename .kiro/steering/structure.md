@@ -9,7 +9,7 @@ description: Estructura de carpetas canónica del proyecto asistente_taller. Act
 > Fuente de verdad para la ubicación de todos los archivos del proyecto.
 > Toda referencia en design.md, tasks.md o cualquier ADR debe coincidir con este documento.
 
-> Actualizado por ingeniería inversa del repositorio el 2026-11-27 (`git ls-files`).
+> Versión 2.0 (2026-11-27), obtenida por ingeniería inversa del repositorio (`git ls-files`). Este árbol no incluye `__pycache__/`, `.pytest_cache/`, `.hypothesis/`, `.env` ni `data/taller.db*`, porque no se versionan.
 
 ```
 Proyecto-Taller/           ← raíz del repositorio
@@ -59,11 +59,18 @@ Proyecto-Taller/           ← raíz del repositorio
     ADR-001.md             ← FastAPI vs Flask vs Django
     ADR-002.md             ← Acceso a datos: lecturas MCP, escrituras repositorio propio
     ADR-003.md             ← Integración de IA con degradación controlada
+    ADR-004.md … ADR-009.md ← decisiones registradas por ingeniería inversa (ver design.md, «Registro de decisiones»)
+    base_datos.sql         ← volcado de data/taller.db (estructura y datos simulados)
     ficha_agente.md, casos_prueba.md, guion_demo.md   ← proyecto final (agente)
     deuda_tecnica.md, resultados_rendimiento.md
     registro_s7.md, trazabilidad_s7.md, reto2_rompan_modulo_s7.md, S7_Guia_de_laboratorio_LosPapus.docx
     maquetas/wireframe_jorge_motors.html
-  .env.example             ← plantilla: GEMINI_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, *_MODEL, AGENTE_PROVEEDOR
+  .kiro/
+    steering/              ← product.md, tech.md, structure.md (este archivo)
+    specs/asistente-taller-jorge-motors/   ← SPEC VIGENTE: requirements.md, design.md, tasks.md (v2.0)
+    specs/gestion-taller-inventario/       ← spec HISTÓRICA (CodeIgniter 4 + MySQL); no describe el sistema actual
+    _historial/kiro_2026-11-27/            ← copia de .kiro antes de la versión 2.0
+  .env.example             ← plantilla: claves y modelos de IA, AGENTE_PROVEEDOR, MODO_TEST, TALLER_DB, XAMPP_*
   .gitignore               ← incluye .env, data/taller.db*, __pycache__, .pytest_cache, .hypothesis
   pytest.ini
   requirements.txt         ← fastapi, uvicorn, httpx, python-dotenv, google-genai, pytest,
@@ -95,3 +102,4 @@ Proyecto-Taller/           ← raíz del repositorio
 |---|---|---|
 | 2026-09-25 | Auditoría Fase 1: estructura de carpetas documentada solo en design.md y tasks.md, sin archivo de steering canónico | Archivo creado como steering con inclusion: auto |
 | 2026-11-27 | Ingeniería inversa del repositorio: faltaban `agente/`, `data/exportar_a_xampp.py`, varios tests y docs; el puerto 8001 del MCP no existe | Árbol actualizado a los archivos reales; puertos confirmados (el MCP usa stdio, no un puerto) |
+| 2026-11-27 | Versión 2.0: no se distinguía la spec vigente de la histórica; faltaban los ADR nuevos y `docs/base_datos.sql` | Sección `.kiro/` con la spec vigente, la histórica y el respaldo; ADR-004 a ADR-009 y el volcado de la base añadidos |
