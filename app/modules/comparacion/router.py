@@ -16,6 +16,8 @@ from app.shared.mcp_client import McpNoDisponibleError, McpReadClient, obtener_c
 router = APIRouter(prefix="/comparacion", tags=["Comparacion"])
 logger = logging.getLogger("asistente_taller")
 
+MENSAJE_NO_GUARDADO = "Aviso: la comparación se calculó, pero no se pudo guardar en el registro. Intente nuevamente"
+
 
 def calcular_resultado(nombre: str, codigo: str, sistema: int, conteo: int) -> ResultadoComparacion:
     """Calcula la diferencia con signo (conteo fisico - sistema) y el indicador de descuadre."""
@@ -65,13 +67,16 @@ def comparar_conteo(
             calcular_resultado(registro["nombre"], registro["codigo"], registro["sistema"], item["conteo_fisico"])
         )
 
+    avisos = []
+    if no_encontrados:
+        avisos.append("Repuesto no encontrado en el inventario: " + ", ".join(no_encontrados))
     if resultados:
         try:
             repositorio.guardar_comparacion(resultados)
         except Exception:
+            # El resultado se muestra igual, pero el usuario debe saber que no quedo registrado (Requisito 5.7)
             logger.exception("No se pudo guardar el resultado de la comparacion")
+            avisos.append(MENSAJE_NO_GUARDADO)
 
-    mensaje = None
-    if no_encontrados:
-        mensaje = "Repuesto no encontrado en el inventario: " + ", ".join(no_encontrados)
+    mensaje = ". ".join(avisos) if avisos else None
     return RespuestaComparacion(resultados=resultados, no_encontrados=no_encontrados, mensaje=mensaje)

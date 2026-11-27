@@ -129,7 +129,7 @@ python -m pytest tests/test_agente.py
 python -m pytest
 ```
 
-Son 81 pruebas (resultado del 27/11/2026: 81 aprobadas). Incluyen pruebas unitarias, las 17 propiedades PBT de `design.md` (Hypothesis), las 7 herramientas MCP, el ciclo del agente con un modelo falso (no gasta cuota de IA) y la prueba de rendimiento de R7.1 (`docs/resultados_rendimiento.md`).
+Son 83 pruebas (resultado del 27/11/2026, después de corregir los defectos: 83 aprobadas). Incluyen pruebas unitarias, las 17 propiedades PBT de `design.md` (Hypothesis), las 7 herramientas MCP, el ciclo del agente con un modelo falso (no gasta cuota de IA) y la prueba de rendimiento de R7.1 (`docs/resultados_rendimiento.md`).
 
 ## Entregables de la sesión 7
 

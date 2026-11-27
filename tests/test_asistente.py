@@ -148,7 +148,37 @@ def test_asistente_recuerda_la_conversacion_de_la_misma_sesion(cliente_con_mcp, 
     assert "¿Cuántas baterías quedan?" not in [m["content"] for m in agente.mensajes_vistos[-1]]
 
 
-@pytest.mark.parametrize("cuerpo", [{"pregunta": "hola", "rol": "Cliente"}, {"pregunta": "", "rol": "Gerente"}])
+@pytest.mark.parametrize(
+    "cuerpo",
+    [{"pregunta": "hola", "rol": "Cliente"}, {"pregunta": "", "rol": "Gerente"}, {"pregunta": "    ", "rol": "Gerente"}],
+)
 def test_asistente_rechaza_rol_o_pregunta_invalidos(cliente_con_mcp, ruta_db, cuerpo):
     respuesta = crear_cliente(cliente_con_mcp, ruta_db, agente_falso()).post("/asistente", json=cuerpo)
     assert respuesta.status_code == 422
+
+
+def test_borrar_conversacion_rechaza_rol_invalido(cliente_con_mcp, ruta_db):
+    cliente = crear_cliente(cliente_con_mcp, ruta_db, agente_falso())
+    assert cliente.delete("/asistente/sesion/abc?rol=Cliente").status_code == 422
+    assert cliente.delete("/asistente/sesion/abc?rol=Gerente").status_code == 204
+
+
+def test_asistente_sin_texto_ni_error_responde_degradado(cliente_con_mcp, ruta_db):
+    # Si el agente no devuelve texto, el chat recibe el aviso y no un mensaje vacio
+    from agente.agente import ResultadoAgente
+
+    class AgenteMudo:
+        def responder(self, sesion, rol, mensaje):
+            return ResultadoAgente()
+
+        def olvidar(self, sesion):
+            pass
+
+    respuesta = crear_cliente(cliente_con_mcp, ruta_db, AgenteMudo()).post(
+        "/asistente", json={"pregunta": "Hola", "rol": "Gerente"}
+    )
+    datos = respuesta.json()
+    assert datos["asistencia"] is None
+    assert datos["mensaje"] == "Asistencia de IA no disponible en este momento"
+    fila = leer_log(ruta_db)[-1]
+    assert fila["respuesta"] is None and fila["error"]

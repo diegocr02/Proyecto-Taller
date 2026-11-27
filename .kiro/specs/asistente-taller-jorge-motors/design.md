@@ -197,7 +197,7 @@ sequenceDiagram
     API->>API: Valida rol y longitud (422 si no cumple)
     API->>Agente: responder("rol:sesion", rol, pregunta)
     Agente->>Agente: instrucciones.txt + fecha + rol + últimos 10 mensajes
-    loop Hasta 4 rondas con herramientas (la 5.ª, sin herramientas)
+    loop Hasta 4 rondas con herramientas (la 5.ª, sin herramientas), en 25 s como máximo
         Agente->>IA: chat/completions {messages, tools} (límite 20 s)
         alt El modelo pide herramientas
             IA-->>Agente: tool_calls
@@ -274,10 +274,10 @@ flowchart TD
 | `Módulo Comparación` | Recibe el conteo físico, consulta el stock registrado y devuelve diferencias con signo | `app/modules/comparacion/` | H5 |
 | `Módulo Reportes` | Genera el reporte de OT por técnico en un rango de fechas y produce el CSV | `app/modules/reportes/` | H6 |
 | `Módulo Asistente IA` | Puente entre el chat y el agente: recibe `{pregunta, rol, sesion}`, llama a `AgenteTaller.responder()` y registra la trazabilidad; también borra la memoria de una conversación | `app/modules/asistente/` | H9 |
-| `AgenteTaller` (JorgeBot) | Agente con bucle de herramientas: envía la pregunta, las instrucciones (`agente/instrucciones.txt`) y las herramientas MCP al modelo; ejecuta las herramientas que pida y devuelve la respuesta. Recuerda las últimas preguntas por sesión. Límite de 20 s por llamada al modelo | `agente/agente.py` | H9 |
+| `AgenteTaller` (JorgeBot) | Agente con bucle de herramientas: envía la pregunta, las instrucciones (`agente/instrucciones.txt`) y las herramientas MCP al modelo; ejecuta las herramientas que pida y devuelve la respuesta. Recuerda las últimas preguntas por sesión. Límite de 20 s por llamada al modelo y de 25 s por pregunta | `agente/agente.py` | H9 |
 | `Servidor MCP` | 7 herramientas de solo lectura (FastMCP, stdio): `buscar_repuesto`, `listar_inventario`, `repuestos_por_reponer`, `historial_vehiculo`, `historial_cliente`, `ordenes_pendientes` y `resumen_ordenes_por_tecnico`. Abre SQLite con `mode=ro`, usa parámetros `?` y `LIMIT`, y no devuelve nombres de clientes | `agente/servidor_mcp.py` | H9 |
 | `McpReadClient` | Acceso de solo lectura para los módulos H2–H6: consulta SQLite con `mode=ro` dentro del proceso (modo stub, activo por defecto) y lanza `McpNoDisponibleError` (→ 503) si la base no está disponible | `app/shared/mcp_client.py` | H2, H3, H4, H5, H6 |
-| `GeminiGateway` | **Componente heredado, sin uso en ejecución.** Era el acceso a Gemini antes del agente; hoy solo lo usa `tests/test_gemini_gateway.py`. El agente llama al modelo directamente | `app/shared/gemini_gateway.py` | — |
+| ~~`GeminiGateway`~~ | **Eliminado el 2026-11-27.** Era el acceso a Gemini antes del agente y ya no se usaba en ejecución; se quitaron `app/shared/gemini_gateway.py`, su prueba y la dependencia `google-genai`. El agente llama al modelo directamente (ADR-005) | — | — |
 | `RepositorioOT` | En una transacción: busca el cliente por DNI y el vehículo por placa, los actualiza si existen o los crea si no, e inserta la OT | `app/modules/ordenes/repositorio.py` | H1 |
 | `RepositorioComparacion` | Guarda cada resultado del conteo físico en `comparaciones_conteo` | `app/modules/comparacion/repositorio.py` | H5 |
 | `RepositorioTrazabilidad` | Guarda cada consulta al agente en `trazabilidad_ia` | `app/modules/asistente/repositorio.py` | H9 |
@@ -287,11 +287,11 @@ flowchart TD
 **Estructura de carpetas (real):** ver `.kiro/steering/structure.md`, que es la fuente de verdad.
 
 ```
-app/            main.py, modules/<7 módulos>/, shared/mcp_client.py, shared/gemini_gateway.py
+app/            main.py, modules/<7 módulos>/, shared/mcp_client.py
 agente/         agente.py, servidor_mcp.py, instrucciones.txt
 frontend/       index.html, static/app.js, static/styles.css, static/img/
 data/           seed.py, exportar_a_xampp.py, taller.db (no se versiona)
-tests/          12 archivos test_*.py + conftest.py
+tests/          11 archivos test_*.py + conftest.py
 docs/           ADR-001..003, ficha del agente, casos de prueba, guion de demo, etc.
 ```
 
@@ -313,7 +313,7 @@ docs/           ADR-001..003, ficha del agente, casos de prueba, guion de demo, 
 | Reportes | GET | /reportes | Query: fecha_inicio=YYYY-MM-DD, fecha_fin=YYYY-MM-DD | 200 {reporte: [{tecnico, total, abierta, en_proceso, cerrada}], mensaje?} | 422 rango inválido; 503 MCP no disponible | R6.1–R6.6 |
 | Reportes CSV | GET | /reportes/csv | Query: fecha_inicio, fecha_fin | 200 text/csv, UTF-8 con BOM (abre bien en Excel), separador coma, 5 columnas | 422 rango inválido; 503 MCP no disponible | R6.5 |
 | Asistente IA | POST | /asistente | Body JSON: {pregunta (1–500), rol ∈ {Recepcionista, Técnico, Encargado_Compras, Gerente}, sesion? (≤64, memoria de la conversación)} | 200 {id_consulta, asistencia, mensaje: null, herramientas: [nombres]} o, si la IA falla, {id_consulta, asistencia: null, mensaje: "Asistencia de IA no disponible en este momento", herramientas: []} | 422 rol o pregunta inválidos | R9.1–R9.3, R10.1–R10.11 |
-| Asistente IA (memoria) | DELETE | /asistente/sesion/{sesion} | Path: sesion; Query: rol | 204 (borra la memoria de esa conversación) | 422 rol faltante | R10.8 |
+| Asistente IA (memoria) | DELETE | /asistente/sesion/{sesion} | Path: sesion; Query: rol | 204 (borra la memoria de esa conversación) | 422 rol faltante o inválido | R10.8 |
 
 ### Implementación del agente (Unidad 3, H-09)
 
@@ -321,7 +321,7 @@ En la Unidad 3 el asistente se implementó como un **agente con herramientas MCP
 
 1. `POST /asistente` (`app/modules/asistente/router.py`) recibe la pregunta y llama a `AgenteTaller.responder(sesion, rol, pregunta)`.
 2. `AgenteTaller` (`agente/agente.py`) manda al modelo las instrucciones de `agente/instrucciones.txt`, la fecha de hoy, el rol, los últimos 10 mensajes de la sesión (memoria de hasta 200 conversaciones) y la lista de herramientas del Servidor MCP. Si la petición no trae `sesion`, la pregunta va sola y se olvida al terminar.
-3. Si el modelo pide una herramienta, el agente la ejecuta en `agente/servidor_mcp.py` (por stdio) y le devuelve el resultado. Puede hacerlo hasta 4 veces; en la última ya no ofrece herramientas y el modelo tiene que responder.
+3. Si el modelo pide una herramienta, el agente la ejecuta en `agente/servidor_mcp.py` (por stdio) y le devuelve el resultado. Puede hacerlo hasta 4 veces, siempre dentro de un tiempo total de 25 s por pregunta; en la última ya no ofrece herramientas y el modelo tiene que responder.
 4. El router guarda en `trazabilidad_ia` la pregunta, las herramientas que se usaron con sus argumentos (`contexto_mcp`, JSON `{"herramientas": [{nombre, argumentos}]}`) y la respuesta o el error. Además devuelve el `id_consulta` y los nombres de las herramientas usadas.
 
 El proveedor del modelo se elige así: `AGENTE_PROVEEDOR` si está definido; si no, la primera clave que exista en este orden: `OPENAI_API_KEY` (modelo por defecto `gpt-4o-mini`), `GEMINI_API_KEY` (`gemini-2.5-flash`), `GROQ_API_KEY` (`llama-3.3-70b-versatile`). Los tres se llaman con la misma API compatible con OpenAI por `httpx`. La ficha del agente está en `docs/ficha_agente.md` y los casos de prueba en `docs/casos_prueba.md`.
@@ -415,7 +415,7 @@ Estas decisiones estaban pendientes en la versión de la Fase 1. El estado de ca
 - **Contratos de la API REST**: **Resuelto.** Ver «Contratos de la API REST» (11 endpoints).
 - **Formato exacto del CSV de exportación**: **Resuelto.** UTF-8 con BOM, separador coma y cabeceras `Técnico, Total OT, Abiertas, En proceso, Cerradas`. El archivo se llama `reporte_ot_<inicio>_<fin>.csv`.
 - **Manejo de concurrencia en SQLite**: **Resuelto (2026-10-09).** `data/seed.py` activa el modo WAL, y tanto `McpReadClient` como el Servidor MCP abren la base en solo lectura (`mode=ro`). Sigue pendiente la prueba automática «crear una OT y buscarla por placa de inmediato» (criterio de reversión 2 del ADR-002).
-- **Timeout de la llamada al modelo**: **Resuelto.** Es de 20 s por llamada (`TIEMPO_LIMITE_MODELO` en `agente/agente.py`; ADR-003, v1.1).
+- **Timeout de la llamada al modelo**: **Resuelto.** Es de 20 s por llamada (`TIEMPO_LIMITE_MODELO`) y de 25 s en total por pregunta (`TIEMPO_TOTAL_RESPUESTA`), ambos en `agente/agente.py` (ADR-003 v1.3, ADR-006).
 - **Estrategia de paginación**: **Resuelto.** No hay paginación: el historial devuelve como máximo las 100 OT más recientes (`LIMIT 100`), y las herramientas MCP usan `LIMIT` de 10 a 50 filas.
 - **Formato del log de trazabilidad**: **Resuelto.** Es la tabla `trazabilidad_ia`; ver «Data Models».
 - **Valores del stock mínimo simulado**: **Resuelto.** Van de 2 a 20 según el repuesto (`data/seed.py`).
@@ -754,18 +754,33 @@ Guarda cada fila de una comparación de conteo físico (Requisito 5, H-05). La e
 | El Servidor MCP no arranca en 15 s | 200 (degradado) | «Asistencia de IA no disponible en este momento» | El error queda en `trazabilidad_ia.error`; la próxima pregunta vuelve a intentar encenderlo |
 | El modelo responde vacío | 200 (degradado) | Igual que el anterior | `RuntimeError("Respuesta vacia del modelo")` queda en `trazabilidad_ia.error` |
 | El proveedor responde con un código distinto de 200 | 200 (degradado) | Igual que el anterior | Se guarda el proveedor, el código y los primeros 200 caracteres del cuerpo de la respuesta (no incluye la clave) |
-| El modelo sigue pidiendo herramientas en la 5.ª vuelta | 200 | **Defecto:** `asistencia` y `mensaje` llegan como `null` (ver «Riesgos conocidos») | Se guarda una entrada sin respuesta y sin error |
-| Pregunta vacía, de más de 500 caracteres o con rol inválido | 422 | `{detail, campos}` | No se llama al agente |
+| El modelo sigue pidiendo herramientas en la 5.ª vuelta | 200 (degradado) | «Asistencia de IA no disponible en este momento» | Error «El modelo no termino de responder…» en `trazabilidad_ia.error` (corregido el 2026-11-27) |
+| La pregunta supera el tiempo total de 25 s | 200 (degradado) | «Asistencia de IA no disponible en este momento» | Error «Se supero el tiempo total de 25 s…» en `trazabilidad_ia.error`; siempre antes del corte de 30 s del navegador |
+| Pregunta vacía o de solo espacios, de más de 500 caracteres o con rol inválido | 422 | `{detail, campos}` | No se llama al agente |
 | Sin resultados (consultas válidas) | 200 | Lista vacía + `mensaje`: «Repuesto no encontrado», «No se encontraron registros para ese criterio de búsqueda», «No hay alertas de stock activas» o «No se encontraron órdenes de trabajo en el período indicado» | No se ejecuta ninguna escritura |
 
-### Riesgos conocidos (detectados por ingeniería inversa; no se corrigieron en esta tarea)
+### Riesgos conocidos
 
-Ver la lista completa, ordenada por gravedad, en el informe de la versión 2.0 (Historial de cambios). Los principales son:
+Detectados por ingeniería inversa el 2026-11-27.
 
-1. El backend no comprueba el rol: las pestañas se ocultan en el navegador, pero cualquiera puede llamar a cualquier endpoint (deuda aceptada en ADR-002).
-2. El agente puede tardar más que el corte de 30 s del navegador (hasta 5 llamadas de 20 s más las herramientas). El usuario vería un error aunque la respuesta llegue a guardarse.
-3. Si el modelo sigue pidiendo herramientas en la 5.ª vuelta, el chat recibe `asistencia: null` y `mensaje: null`.
-4. Si falla el guardado de una comparación, solo se registra en el log; el usuario no se entera.
+**Corregidos el 2026-11-27** (cada uno con su prueba automática):
+
+| Defecto | Corrección | Prueba |
+|---|---|---|
+| El agente podía tardar más que el corte de 30 s del navegador (5 llamadas de 20 s más las herramientas) | Tiempo total de 25 s por pregunta (`TIEMPO_TOTAL_RESPUESTA`). Cada llamada usa como máximo el tiempo que queda; con menos de 1 s no se inicia otra | `test_agente.py::test_agente_respeta_el_tiempo_total_por_pregunta`, `test_tiempo_total_del_agente_es_menor_que_el_corte_del_navegador` |
+| Si el modelo seguía pidiendo herramientas en la 5.ª vuelta, el chat recibía `asistencia` y `mensaje` en `null` | El agente lo trata como error; el router también responde en modo degradado si no hay texto | `test_agente.py::test_agente_que_no_termina_de_responder_devuelve_error`, `test_asistente.py::test_asistente_sin_texto_ni_error_responde_degradado` |
+| Una pregunta de solo espacios pasaba la validación y llegaba vacía al agente | Validador que recorta los espacios y responde 422 | `test_asistente.py::test_asistente_rechaza_rol_o_pregunta_invalidos` |
+| `DELETE /asistente/sesion/{sesion}` aceptaba cualquier rol | `rol` validado con los 4 valores; si no, 422 | `test_asistente.py::test_borrar_conversacion_rechaza_rol_invalido` |
+| Si fallaba el guardado de una comparación, el usuario no se enteraba | El resultado se muestra igual, con el aviso «no se pudo guardar en el registro» | `test_comparacion.py::test_comparacion_avisa_si_no_se_pudo_guardar` |
+| En las herramientas MCP, `%` y `_` funcionaban como comodines | Se escapan con `ESCAPE '!'`, como en `McpReadClient` | `test_agente.py::test_comodines_like_se_buscan_literales` |
+| `GeminiGateway` y `google-genai` eran código y dependencia sin uso | Eliminados | — |
+
+**Siguen abiertos** (no son defectos de programación; requieren una decisión del equipo):
+
+1. El backend no comprueba el rol: las pestañas se ocultan en el navegador, pero cualquiera puede llamar a cualquier endpoint. Corregirlo requiere inicio de sesión, que está FUERA del alcance (deuda aceptada en ADR-002).
+2. Con claves de OpenAI y de Gemini en `.env` se usa OpenAI, que es de pago (orden de prioridad del ADR-005). Se cambia en `.env` con `AGENTE_PROVEEDOR=gemini`, sin tocar código.
+3. La memoria del agente vive en el proceso y se pierde al reiniciar el servidor, aunque el chat siga mostrando la conversación (ADR-006).
+4. Las fechas de las OT simuladas dependen del día en que se corre `seed.py`, así que los casos de prueba con fechas no se repiten igual en una base nueva.
 
 ---
 
@@ -776,7 +791,7 @@ Ver la lista completa, ordenada por gravedad, en el informe de la versión 2.0 (
 | Claves de IA | Solo en variables de entorno (`.env`, en `.gitignore`); el código nunca las imprime | `agente/agente.py` (`os.getenv`), `.gitignore` |
 | Arranque sin clave | Termina con `sys.exit(1)` y un mensaje que no menciona la clave | `app/main.py` (`verificar_clave_gemini`) |
 | Inyección SQL | Todas las consultas con datos del usuario usan `?`. `buscar_repuesto` arma con f-string solo la **estructura** (`?` repetidos), nunca los valores | `agente/servidor_mcp.py`, repositorios |
-| Comodines de LIKE | La pantalla de inventario escapa `%`, `_` y `!` (`ESCAPE '!'`). Las herramientas MCP **no** los escapan: un `%` del usuario funciona como comodín, aunque igual en solo lectura | `app/shared/mcp_client.py` (`_escapar_like`); `agente/servidor_mcp.py` |
+| Comodines de LIKE | La pantalla de inventario y las herramientas MCP escapan `%`, `_` y `!` (`ESCAPE '!'`), así que el texto del usuario se busca literal (corregido en las herramientas MCP el 2026-11-27) | `_escapar_like` en `app/shared/mcp_client.py` y en `agente/servidor_mcp.py` |
 | Solo lectura | El Servidor MCP y `McpReadClient` abren la base con `mode=ro` | `tests/test_agente.py::test_herramientas_son_de_solo_lectura` |
 | Datos personales | Datos simulados; `historial_cliente` no devuelve nombres; regla 7 de las instrucciones | `tests/test_agente.py::test_historial_cliente_no_expone_nombre_ni_dni_ajenos` |
 | XSS en la interfaz | Los textos del servidor pasan por `escapar()` antes de insertarse como HTML. Se revisaron las tablas, el detalle de OT, las alertas, las insignias y el chat; no se auditó cada línea de `app.js` | `frontend/static/app.js` (`escapar`, `tabla`, `formatearRespuesta`) |
@@ -817,7 +832,7 @@ Cada prueba de propiedad debe incluir un comentario de etiqueta en el formato:
 
 Las propiedades que dependen del modelo de IA usan un modelo falso para que las pruebas sean rápidas y deterministas. El Servidor MCP real sí se prueba: `tests/test_agente.py` llama a sus 7 herramientas sobre una base temporal, comprueba que son de solo lectura y enciende el servidor por stdio para listar sus herramientas.
 
-**Estado al 2026-11-27:** `python -m pytest` da **81 pruebas aprobadas** en 12 archivos (`tests/test_*.py`). `tests/test_rendimiento.py` mide el p95 (ver `docs/resultados_rendimiento.md`).
+**Estado al 2026-11-27:** `python -m pytest` da **83 pruebas aprobadas** en 11 archivos (`tests/test_*.py`), después de corregir los defectos (se quitaron las 6 de `GeminiGateway` y se agregaron 8). `tests/test_rendimiento.py` mide el p95 (ver `docs/resultados_rendimiento.md`).
 
 ### Pruebas de humo (*smoke tests*)
 
@@ -836,13 +851,12 @@ Las propiedades que dependen del modelo de IA usan un modelo falso para que las 
 | `Módulo Alertas` | PBT (Propiedad 11) + ejemplo (lista vacía) |
 | `Módulo Comparación` | PBT (Propiedades 12, 13) + ejemplo (repuesto inexistente) |
 | `Módulo Reportes` | PBT (Propiedades 14, 15, 16) + integración con mock MCP |
-| `GeminiGateway` (heredado) | Integración con mock (error, timeout, éxito) |
 | `Módulo Asistente IA` | PBT (Propiedad 17) + integración con agente falso |
 | `Servidor MCP` y `AgenteTaller` | Ejemplos sobre base temporal (7 herramientas, solo lectura, sin nombres de clientes) + ciclo del agente con modelo falso |
 
 ### Casos de prueba vigentes por requisito
 
-Ejecución automática del 2026-11-27: `python -m pytest` → **81 aprobadas, 0 fallidas** (195 s). Los casos manuales del agente están en `docs/casos_prueba.md`.
+Ejecución automática del 2026-11-27, después de corregir los defectos: `python -m pytest` → **83 aprobadas, 0 fallidas** (199 s). Los casos manuales del agente están en `docs/casos_prueba.md`.
 
 | Requisito | Pruebas automáticas (archivo::prueba) | Manual / estado |
 |---|---|---|
@@ -850,12 +864,12 @@ Ejecución automática del 2026-11-27: `python -m pytest` → **81 aprobadas, 0 
 | R2 | `test_historial.py`: propiedades 4, 5 y 6, `mcp_no_disponible`, `detalle_inexistente`, `busqueda_valida`; `test_mcp_client.py` (historial) | — |
 | R3 | `test_inventario.py`: propiedades 7 a 10, `no_encontrado`, `mcp_no_disponible`, `termino_demasiado_largo`; `test_mcp_client.py::test_mcp_consultar_stock_comodines_literales` | — |
 | R4 | `test_alertas.py`: propiedad 11, `mcp_no_disponible` | 4.4 (contador): **NO VERIFICADO** con prueba automática |
-| R5 | `test_comparacion.py`: propiedades 12 y 13, `sin_items`, `repuesto_inexistente_se_excluye`, `se_persiste`, `mcp_no_disponible` | — |
+| R5 | `test_comparacion.py`: propiedades 12 y 13, `sin_items`, `repuesto_inexistente_se_excluye`, `se_persiste`, `avisa_si_no_se_pudo_guardar`, `mcp_no_disponible` | — |
 | R6 | `test_reportes.py`: propiedades 14, 15 y 16, `mcp_no_disponible`, `fecha_mal_formada` | — |
 | R7 | `test_rendimiento.py::test_rendimiento_p95` | 7.2 y 7.3 (indicador y corte en el navegador): **NO VERIFICADO** con prueba automática |
 | R8 | — | 8.3 (arranque sin clave): **NO VERIFICADO** con prueba automática; 8.2: revisión de `data/seed.py` |
 | R9 | `test_asistente.py`: propiedad 17, `degradado_cuando_el_modelo_falla`, `informa_y_registra_la_herramienta_usada` | — |
-| R10 | `test_agente.py` (12 pruebas); `test_asistente.py`: `recuerda_la_conversacion_de_la_misma_sesion`, `rechaza_rol_o_pregunta_invalidos` | 10.3–10.5: casos 7 a 10 de `docs/casos_prueba.md` (25/11/2026) y casos A1–A10 (27/11/2026). 10.6, 10.8, 10.9 y 10.12: **pendientes de ejecutar** |
+| R10 | `test_agente.py` (16 pruebas, incluidas las de comodines, tiempo total y respuesta sin terminar); `test_asistente.py`: `recuerda_la_conversacion_de_la_misma_sesion`, `rechaza_rol_o_pregunta_invalidos`, `borrar_conversacion_rechaza_rol_invalido`, `sin_texto_ni_error_responde_degradado` | 10.3–10.5: casos 7 a 10 de `docs/casos_prueba.md` (25/11/2026) y casos A1–A10 (27/11/2026). 10.6, 10.8, 10.9 y 10.12: **pendientes de ejecutar** |
 | R11 | — | **Pendiente de ejecutar** (casos nuevos en `docs/casos_prueba.md`) |
 | R12 | — | Ejecutado a mano el 2026-11-27: 7 tablas, mismas filas y tildes en UTF-8 en `jorge_motors_app` |
 
@@ -871,3 +885,4 @@ Ejecución automática del 2026-11-27: `python -m pytest` → **81 aprobadas, 0 
 | 2026-09-25 | Auditoría Fase 1 — Verificación 2: interfaces sin verbos HTTP ni códigos de respuesta | Añadida tabla de Contratos de la API REST con verbo, ruta, parámetros, código de éxito, códigos de error y requisitos para los 9 endpoints |
 | 2026-11-27 | Ingeniería inversa del código y de `data/taller.db`: el documento describía el diseño de la Fase 1 (Gemini vía `GeminiGateway`, MCP en el puerto 8001) y no el sistema construido | Overview y diagramas C4 N1–N3 y de despliegue actualizados al agente JorgeBot (Servidor MCP por stdio, proveedores OpenAI/Gemini/Groq). Componentes: se agregan `AgenteTaller`, Servidor MCP y `RepositorioTrazabilidad`, y `GeminiGateway` se marca como heredado. Contratos de la API: 11 endpoints con los campos reales (`kilometraje`, `observaciones`, `no_encontrados`, `sesion`, `herramientas`, `GET /ordenes/{id_ot}`, `DELETE /asistente/sesion/{sesion}`). «Decisiones no tomadas» pasa a «Decisiones tomadas». Data Models: se agrega la tabla `comparaciones_conteo` y el rango 2–20 de `stock_minimo`. Errores y estrategia de pruebas: mensajes reales y 81 pruebas |
 | 2026-11-27 | Versión 2.0 (ingeniería inversa completa) | Se agregan: secuencia de una pregunta al asistente, las 7 herramientas MCP con su SQL real y las reglas del agente, el registro de decisiones (ADR-004 a ADR-009), el diagrama entidad-relación con el número de filas, errores propios del agente, riesgos conocidos, la sección Seguridad y los casos de prueba vigentes por requisito |
+| 2026-11-27 | Corrección de defectos detectados en la v2.0 | Tiempo total de 25 s por pregunta, respuesta vacía de la 5.ª vuelta en modo degradado, rechazo de preguntas de solo espacios y de roles inválidos al borrar, aviso si no se guarda una comparación, comodines escapados en las herramientas MCP y eliminación de `GeminiGateway`. «Riesgos conocidos» separa lo corregido de lo que sigue abierto; 83 pruebas |

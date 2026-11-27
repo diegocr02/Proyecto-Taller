@@ -39,6 +39,11 @@ MAX_MENSAJES_MEMORIA = 10   # ultimos mensajes que se recuerdan por conversacion
 MAX_SESIONES = 200          # conversaciones guardadas en memoria a la vez
 MAX_VUELTAS_HERRAMIENTAS = 4
 TIEMPO_LIMITE_MODELO = 20.0  # segundos por llamada al modelo
+# Tiempo total por pregunta: menor que el corte de 30 s del navegador (Requisito 7.3),
+# asi el usuario siempre recibe la respuesta o el aviso de "IA no disponible"
+TIEMPO_TOTAL_RESPUESTA = 25.0
+TIEMPO_MINIMO_LLAMADA = 1.0  # si queda menos que esto, no se inicia otra llamada
+TIEMPO_LIMITE_HERRAMIENTA = 10.0
 
 PROVEEDORES = {
     "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1", "OPENAI_MODEL", "gpt-4o-mini"),
@@ -169,8 +174,10 @@ class AgenteTaller:
         listar_herramientas: Optional[Callable[[], List[Dict[str, Any]]]] = None,
     ):
         self._mcp = ConexionMCP() if (ejecutar_herramienta is None or listar_herramientas is None) else None
+        # Los dobles de prueba reciben 2 argumentos; los reales tambien reciben el tiempo que queda
         self._llamar_modelo = llamar_modelo or self._llamar_modelo_api
-        self._ejecutar_herramienta = ejecutar_herramienta or self._mcp.ejecutar
+        self._ejecutar_herramienta = ejecutar_herramienta or self._ejecutar_en_mcp
+        self._modelo_real = llamar_modelo is None
         self._listar_herramientas = listar_herramientas or (lambda: herramientas_a_formato_modelo(self._mcp.listar_herramientas()))
         self._memoria: "OrderedDict[str, List[Dict[str, str]]]" = OrderedDict()
         self._candado = threading.Lock()
@@ -202,8 +209,13 @@ class AgenteTaller:
         with self._candado:
             self._memoria.pop(sesion, None)
 
+    def _ejecutar_en_mcp(self, nombre: str, argumentos: Dict[str, Any], espera: float = TIEMPO_LIMITE_HERRAMIENTA) -> str:
+        return self._mcp.ejecutar(nombre, argumentos, espera=espera)
+
     # --- llamada al modelo (API compatible con OpenAI) ---
-    def _llamar_modelo_api(self, mensajes: List[Dict[str, Any]], herramientas: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _llamar_modelo_api(
+        self, mensajes: List[Dict[str, Any]], herramientas: List[Dict[str, Any]], tiempo: float = TIEMPO_LIMITE_MODELO
+    ) -> Dict[str, Any]:
         proveedor = elegir_proveedor()
         if proveedor is None:
             raise RuntimeError("Clave de API no configurada")
@@ -222,6 +234,7 @@ class AgenteTaller:
             f"{url_base}/chat/completions",
             headers={"Authorization": f"Bearer {os.getenv(variable_clave)}"},
             json=cuerpo,
+            timeout=min(TIEMPO_LIMITE_MODELO, tiempo),
         )
         if respuesta.status_code != 200:
             raise RuntimeError(f"{proveedor} {respuesta.status_code}: {respuesta.text[:200]}")
@@ -231,6 +244,14 @@ class AgenteTaller:
     def responder(self, sesion: str, rol: str, mensaje: str) -> ResultadoAgente:
         resultado = ResultadoAgente()
         inicio = time.monotonic()
+        limite = inicio + TIEMPO_TOTAL_RESPUESTA
+
+        def tiempo_restante() -> float:
+            restante = limite - time.monotonic()
+            if restante < TIEMPO_MINIMO_LLAMADA:
+                raise TimeoutError(f"Se supero el tiempo total de {TIEMPO_TOTAL_RESPUESTA:.0f} s para responder")
+            return restante
+
         try:
             with open(RUTA_INSTRUCCIONES, encoding="utf-8") as archivo:
                 instrucciones = archivo.read()
@@ -244,7 +265,12 @@ class AgenteTaller:
 
             for vuelta in range(MAX_VUELTAS_HERRAMIENTAS + 1):
                 # En la ultima vuelta ya no se ofrecen herramientas: el modelo debe responder
-                respuesta_modelo = self._llamar_modelo(mensajes, herramientas if vuelta < MAX_VUELTAS_HERRAMIENTAS else [])
+                ofrecidas = herramientas if vuelta < MAX_VUELTAS_HERRAMIENTAS else []
+                restante = tiempo_restante()
+                if self._modelo_real:
+                    respuesta_modelo = self._llamar_modelo(mensajes, ofrecidas, restante)
+                else:
+                    respuesta_modelo = self._llamar_modelo(mensajes, ofrecidas)
                 llamadas = respuesta_modelo.get("tool_calls") or []
                 if not llamadas:
                     texto = (respuesta_modelo.get("content") or "").strip()
@@ -261,12 +287,18 @@ class AgenteTaller:
                         argumentos = {}
                     logger.info("Agente usa la herramienta MCP %s %s", nombre, argumentos)
                     try:
-                        dato = self._ejecutar_herramienta(nombre, argumentos)
+                        if self._ejecutar_herramienta == self._ejecutar_en_mcp:
+                            dato = self._ejecutar_en_mcp(nombre, argumentos, min(TIEMPO_LIMITE_HERRAMIENTA, tiempo_restante()))
+                        else:
+                            dato = self._ejecutar_herramienta(nombre, argumentos)
                     except Exception as error:
                         logger.error("Fallo la herramienta %s: %s", nombre, error)
                         dato = json.dumps({"error": "La herramienta no respondió. Intente más tarde."})
                     resultado.herramientas_usadas.append({"nombre": nombre, "argumentos": argumentos})
                     mensajes.append({"role": "tool", "tool_call_id": llamada["id"], "content": dato})
+            if resultado.respuesta is None:
+                # El modelo siguio pidiendo herramientas incluso sin tenerlas: se trata como error
+                raise RuntimeError("El modelo no termino de responder despues de usar las herramientas")
         except Exception as error:
             logger.error("Error del agente: %s", error)
             resultado.error = str(error) or error.__class__.__name__

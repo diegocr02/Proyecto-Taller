@@ -100,3 +100,16 @@ def test_comparacion_mcp_no_disponible(cliente_con_mcp):
     )
     assert respuesta.status_code == 503
     assert respuesta.json()["detail"] == "El servicio de inventario no está disponible en este momento"
+
+
+def test_comparacion_avisa_si_no_se_pudo_guardar(cliente_con_mcp, ruta_db):
+    insertar_repuestos(ruta_db, [("REP-001", "Filtro", "unidad", 2, 5)])
+
+    class RepositorioRoto:
+        def guardar_comparacion(self, resultados):
+            raise OSError("disco lleno")
+
+    cliente = cliente_con_mcp(McpEspia(ruta_db=ruta_db), overrides={obtener_repositorio_comparacion: RepositorioRoto()})
+    datos = cliente.post("/comparacion", json={"items": [{"codigo": "REP-001", "conteo_fisico": 3}]}).json()
+    assert datos["resultados"][0]["diferencia"] == -2  # el resultado se muestra igual
+    assert "no se pudo guardar" in datos["mensaje"]

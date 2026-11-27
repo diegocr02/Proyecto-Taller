@@ -26,7 +26,6 @@ Proyecto-Taller/           ← raíz del repositorio
       asistente/           ← Módulo Asistente IA (H9): schemas.py, router.py, repositorio.py (trazabilidad)
     shared/
       mcp_client.py        ← McpReadClient: lectura de solo lectura para H2–H6 (stub sobre SQLite mode=ro)
-      gemini_gateway.py    ← GeminiGateway: HEREDADO, sin uso en ejecución (solo su prueba)
   agente/                  ← Agente JorgeBot (proyecto final, H9)
     agente.py              ← AgenteTaller: bucle de herramientas, proveedores OpenAI/Gemini/Groq
     servidor_mcp.py        ← Servidor MCP (FastMCP, stdio): 7 herramientas de solo lectura
@@ -53,7 +52,6 @@ Proyecto-Taller/           ← raíz del repositorio
     test_asistente.py
     test_agente.py         ← Servidor MCP (7 herramientas) y ciclo del agente
     test_mcp_client.py
-    test_gemini_gateway.py
     test_rendimiento.py    ← p95 ≤ 5 s (R7.1)
   docs/
     ADR-001.md             ← FastAPI vs Flask vs Django
@@ -73,7 +71,7 @@ Proyecto-Taller/           ← raíz del repositorio
   .env.example             ← plantilla: claves y modelos de IA, AGENTE_PROVEEDOR, MODO_TEST, TALLER_DB, XAMPP_*
   .gitignore               ← incluye .env, data/taller.db*, __pycache__, .pytest_cache, .hypothesis
   pytest.ini
-  requirements.txt         ← fastapi, uvicorn, httpx, python-dotenv, google-genai, pytest,
+  requirements.txt         ← fastapi, uvicorn, httpx, python-dotenv, pytest,
                              hypothesis, pydantic, mcp[cli]<2
   README.md
 ```

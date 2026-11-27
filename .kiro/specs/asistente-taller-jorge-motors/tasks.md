@@ -1,6 +1,6 @@
 # Implementation Plan: Asistente de Gestión de Taller y Repuestos — Jorge Motors
 
-**Versión:** 2.0 · **Fecha:** 2026-11-27. Las casillas se revisaron contra el código y contra la ejecución de `python -m pytest` del 2026-11-27 (81 aprobadas). [x] = existe y funciona; [ ] = pendiente real. Cada `_Requisitos: x.y_` remite a `requirements.md` v2.0.
+**Versión:** 2.0 · **Fecha:** 2026-11-27. Las casillas se revisaron contra el código y contra la ejecución de `python -m pytest` del 2026-11-27 (83 aprobadas, después de corregir los defectos). [x] = existe y funciona; [ ] = pendiente real. Cada `_Requisitos: x.y_` remite a `requirements.md` v2.0.
 
 ## Overview
 
@@ -223,10 +223,10 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - Leer `GEMINI_API_KEY` exclusivamente desde variable de entorno (nunca del código — Requisito 8.1)
     - Aplicar timeout < 30 s; retornar resultado tipado: `GeminiExito(respuesta: str)` o `GeminiError(mensaje: str)`
     - En caso de error o timeout, retornar `GeminiError` sin propagar excepción al llamador (degradación controlada — ADR-003)
-    - *Estado v2.0:* existe y su prueba pasa, pero **no se usa en ejecución**; lo reemplazó el agente de la tarea 15 (ADR-004)
+    - *Estado v2.0:* se hizo en la S7, pero dejó de usarse cuando lo reemplazó el agente de la tarea 15 (ADR-004). **Se eliminó el 2026-11-27**, junto con su prueba y `google-genai`; la degradación controlada (9.3) la cumple ahora el agente
     - _Requisitos: 8.1, 9.3_
 
-  - [x]* 11.2 Escribir pruebas unitarias para GeminiGateway
+  - [x]* 11.2 Escribir pruebas unitarias para GeminiGateway *(eliminadas el 2026-11-27 junto con `GeminiGateway`)*
     - Verificar comportamiento en éxito (mock de respuesta Gemini)
     - Verificar que timeout retorna `GeminiError` sin propagar excepción
     - Verificar que error de API retorna `GeminiError`
@@ -314,8 +314,14 @@ Implementación incremental del sistema completo: primero la base de datos y la 
     - _Requisitos: 1.1, 2.1_
   - [ ]* 18.5 Pruebas automáticas que faltan: actualizar el cliente o vehículo existente, contador de alertas, arranque sin clave, borrar una conversación y pestañas por rol
     - _Requisitos: 1.8, 4.4, 8.3, 10.8, 11.2_
-  - [ ] 18.6 Corregir los defectos anotados en design.md («Riesgos conocidos»): respuesta vacía en la 5.ª vuelta y tiempo del agente mayor que el corte de 30 s del navegador
-    - _Requisitos: 7.3, 9.3, 10.10_
+  - [x] 18.6 Corregir los defectos anotados en design.md («Riesgos conocidos») *(hecho el 2026-11-27, con pruebas)*
+    - Tiempo total de 25 s por pregunta, menor que el corte de 30 s del navegador
+    - Respuesta vacía en la 5.ª vuelta → modo degradado
+    - Pregunta de solo espacios → 422; rol inválido al borrar una conversación → 422
+    - Aviso si no se pudo guardar una comparación
+    - Comodines `%` y `_` escapados en las herramientas MCP
+    - Eliminados `GeminiGateway`, su prueba y `google-genai`
+    - _Requisitos: 5.7, 7.3, 9.3, 10.10, 10.11_
   - [ ]* 18.7 Ejecutar los casos de prueba «pendiente de ejecutar» de `docs/casos_prueba.md` (P1 a P12)
     - _Requisitos: 1.8, 4.4, 8.3, 10.1, 10.6, 10.8, 10.9, 10.11, 10.12, 11.2_
 
@@ -327,7 +333,7 @@ Implementación incremental del sistema completo: primero la base de datos y la 
 - Cada tarea referencia los requisitos específicos del documento `requirements.md` para trazabilidad.
 - Las pruebas de propiedades (Hypothesis) deben ejecutarse con mínimo 100 iteraciones; las que involucran MCP o Gemini usan mocks para mantener las pruebas rápidas y deterministas.
 - `McpReadClient` sigue en modo stub (lee SQLite con `mode=ro` en el mismo proceso) para los módulos H2–H6. El Servidor MCP real del proyecto (`agente/servidor_mcp.py`) lo usa el agente JorgeBot por stdio (tarea 15).
-- `GeminiGateway` (tarea 11.1) quedó como componente heredado: ya no se usa en ejecución y solo lo usa su prueba.
+- `GeminiGateway` (tarea 11.1) se eliminó el 2026-11-27: no se usaba en ejecución.
 - Los checkpoints en las tareas 3, 9 y 14 garantizan validación incremental antes de avanzar al siguiente módulo.
 - El rol de usuario se selecciona en la UI sin autenticación (deuda técnica aceptada, documentada en ADR-002).
 

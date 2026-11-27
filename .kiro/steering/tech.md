@@ -23,7 +23,6 @@ Redacta en español.
 | python-dotenv | 1.2.4 | 1.2.4 | Lectura de `.env` |
 | pydantic | 2.14.0 | 2.14.0 | Validación de cuerpos y respuestas |
 | mcp[cli] | <2 | 1.30.0 | Servidor MCP (FastMCP) y cliente stdio del agente; la versión 2 no es compatible |
-| google-genai | 1.72.0 | 1.72.0 | Solo lo usa `GeminiGateway`, que es código heredado sin uso en ejecución |
 | pytest | 9.1.1 | 9.1.1 | Pruebas |
 | hypothesis | 6.168.5 | 6.168.5 | Pruebas basadas en propiedades |
 
@@ -45,7 +44,7 @@ Redacta en español.
 | Groq | `GROQ_API_KEY` | `GROQ_MODEL` | `llama-3.3-70b-versatile` |
 
 - Selección: `AGENTE_PROVEEDOR` si está definido y tiene clave; si no, el primero con clave en el orden OpenAI → Gemini → Groq. En el `.env` actual hay claves de OpenAI y de Gemini, así que **se usa OpenAI**. El valor de `OPENAI_MODEL` no se documenta.
-- Parámetros fijos: `temperature` 0.2, `max_tokens` 450, 20 s de límite por llamada, hasta 4 rondas de herramientas, memoria de 10 mensajes por conversación y 200 conversaciones a la vez.
+- Parámetros fijos: `temperature` 0.2, `max_tokens` 450, 20 s de límite por llamada, 25 s de límite total por pregunta, hasta 4 rondas de herramientas, memoria de 10 mensajes por conversación y 200 conversaciones a la vez.
 - Las claves solo se leen de variables de entorno.
 
 ## Base de datos

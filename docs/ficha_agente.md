@@ -35,15 +35,16 @@ Las consultas SQL exactas están en `.kiro/specs/asistente-taller-jorge-motors/d
 | Límite | Valor |
 |---|---|
 | Tiempo máximo por llamada al modelo | 20 s |
+| Tiempo máximo total por pregunta | 25 s; si se supera, el chat muestra «Asistencia de IA no disponible en este momento» |
 | Rondas de herramientas por pregunta | 4 (en la 5.ª llamada el modelo ya no tiene herramientas y tiene que responder) |
-| Espera por herramienta | 10 s; si falla, el modelo recibe «La herramienta no respondió» |
+| Espera por herramienta | 10 s (o lo que quede de los 25 s); si falla, el modelo recibe «La herramienta no respondió» |
 | Espera al encender el servidor MCP | 15 s |
 | Memoria por conversación | Últimos 10 mensajes (5 preguntas y respuestas); se pierde al reiniciar el servidor |
 | Conversaciones en memoria a la vez | 200 |
-| Largo de la pregunta | 1 a 500 caracteres |
+| Largo de la pregunta | 1 a 500 caracteres; una pregunta de solo espacios se rechaza |
 | Largo de la respuesta | `max_tokens` 450; `temperature` 0.2 |
 | Conversaciones guardadas en el navegador | 15 |
-| Corte del navegador | 30 s (puede ser menor que el peor caso del agente; ver «Riesgos» en design.md) |
+| Corte del navegador | 30 s; el agente siempre termina antes, porque tiene un tope de 25 s |
 
 ## Cómo funciona
 

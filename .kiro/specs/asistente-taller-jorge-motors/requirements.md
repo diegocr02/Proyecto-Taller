@@ -19,6 +19,7 @@
 | R10 | **Nuevo:** agente conversacional JorgeBot | `agente/agente.py`, `agente/servidor_mcp.py`, `agente/instrucciones.txt` |
 | R11 | **Nuevo:** interfaz por rol | `PANTALLAS_POR_ROL` en `frontend/static/app.js` |
 | R12 | **Nuevo:** copia de revisión de la base en XAMPP | `data/exportar_a_xampp.py` |
+| R5.7, R10.10, R10.11 | Ajustados el 2026-11-27 al corregir defectos: aviso si no se guarda la comparación, tiempo total de 25 s por pregunta y rechazo de preguntas de solo espacios | `app/modules/comparacion/router.py`, `agente/agente.py`, `app/modules/asistente/schemas.py` |
 | — | Se crea la sección «Requisitos retirados o pendientes» | Criterios de la v1.0 que el código no cumple |
 
 ## Introduction
@@ -125,7 +126,7 @@ Componentes: un backend FastAPI (Python 3.11+; instalado 3.12.10), un frontend H
 4. SI no se ingresa ningún repuesto, ENTONCES EL Sistema DEBERÁ responder 422 con «Debe ingresar al menos un repuesto con su conteo físico».
 5. SI el Servicio_de_lectura no está disponible, ENTONCES EL Sistema DEBERÁ responder 503 y no ejecutar la comparación.
 6. SI un código ingresado no existe en el inventario, ENTONCES EL Sistema DEBERÁ excluirlo de los resultados y listarlo en `no_encontrados` con un aviso.
-7. CUANDO se calcule una comparación, EL Sistema DEBERÁ guardar cada fila en la tabla `comparaciones_conteo` con su fecha y hora.
+7. CUANDO se calcule una comparación, EL Sistema DEBERÁ guardar cada fila en la tabla `comparaciones_conteo` con su fecha y hora; SI no puede guardarla, ENTONCES DEBERÁ mostrar el resultado con un aviso de que no quedó registrado.
 
 ---
 
@@ -195,8 +196,8 @@ Componentes: un backend FastAPI (Python 3.11+; instalado 3.12.10), un frontend H
 7. CUANDO el usuario haga una pregunta de seguimiento en la misma Sesión_de_chat, EL Agente DEBERÁ tener en cuenta los últimos 10 mensajes de esa sesión.
 8. CUANDO el usuario borre una conversación con el botón de la papelera, EL Sistema DEBERÁ olvidar su memoria (`DELETE /asistente/sesion/{sesion}`) y quitarla de la lista de conversaciones recientes.
 9. CUANDO el Agente use una herramienta, EL Sistema DEBERÁ mostrar en la respuesta del chat el nombre de la herramienta usada.
-10. EL Agente DEBERÁ limitar cada llamada al Proveedor_IA a 20 segundos y hacer como máximo 4 rondas de herramientas por pregunta.
-11. SI la pregunta está vacía o supera los 500 caracteres, o el rol no es uno de los cuatro válidos, ENTONCES EL Sistema DEBERÁ responder 422 sin llamar al Agente.
+10. EL Agente DEBERÁ limitar cada llamada al Proveedor_IA a 20 segundos, hacer como máximo 4 rondas de herramientas por pregunta y terminar cada pregunta en 25 segundos como máximo, para responder antes del corte de 30 segundos del navegador (7.3).
+11. SI la pregunta está vacía, tiene solo espacios o supera los 500 caracteres, o el rol no es uno de los cuatro válidos (también al borrar una conversación), ENTONCES EL Sistema DEBERÁ responder 422 sin llamar al Agente.
 12. EL Sistema DEBERÁ guardar en el navegador hasta 15 conversaciones recientes, para retomarlas desde la lista «Conversaciones recientes».
 
 ---
